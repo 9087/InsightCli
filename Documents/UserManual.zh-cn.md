@@ -257,7 +257,7 @@ InsightCli.exe C:/traces/run01.utrace cpu top --thread GameThread --limit 5
   "data": [
     {
       "scope_name": "MoveActors",
-      "thread_id": 42,
+      "thread_id": 1234,
       "call_count": 312,
       "total_ms": 415.7,
       "avg_ms": 1.33,
@@ -297,7 +297,7 @@ InsightCli.exe C:/traces/run01.utrace cpu stack --frame-index 120 --thread GameT
   "data": [
     {
       "frame_index": 120,
-      "thread_id": 42,
+      "thread_id": 1234,
       "thread_name": "GameThread",
       "scope_name": "MoveActors",
       "self_ms": 4.2,
@@ -406,19 +406,19 @@ InsightCli.exe C:/traces/run01.utrace threads waits --frame-index 120 --limit 5
   "data": [
     {
       "frame_index": 120,
-      "thread_id": 42,
+      "thread_id": 1234,
       "thread_name": "GameThread",
       "wait_type": "Event",
       "wait_object": "SyncObj#1200",
       "wait_ms": 3.5,
-      "owner_thread_id": 58,
+      "owner_thread_id": 5678,
       "owner_thread_name": "RenderThread",
-      "blocker_thread_id": 58,
+      "blocker_thread_id": 5678,
       "blocker_thread_name": "RenderThread",
       "chain_depth": 1,
       "chain_status": "resolved",
       "unresolved_reason": "",
-      "blocked_to_blocker_thread_chain": [42, 58],
+      "blocked_to_blocker_thread_chain": [1234, 5678],
       "begin_ms": 5101.0,
       "end_ms": 5104.5
     }

@@ -33,9 +33,6 @@ bool HandleCpuCommands(const FInsightCliRequest& Request, const FTraceContext& C
 			if (!ThreadFilter.Equals(TEXT("GameThread"), ESearchCase::IgnoreCase)
 				&& !ThreadFilter.Equals(TEXT("RenderThread"), ESearchCase::IgnoreCase)
 				&& !ThreadFilter.Equals(TEXT("RHIThread"), ESearchCase::IgnoreCase)
-				&& ThreadFilter != TEXT("42")
-				&& ThreadFilter != TEXT("43")
-				&& ThreadFilter != TEXT("44")
 				&& !ThreadFilter.IsNumeric())
 			{
 				TMap<FString, FString> Meta = MakeNotFoundMeta(Request, TEXT("unsupported_filter"), TEXT("thread"), ThreadFilter);

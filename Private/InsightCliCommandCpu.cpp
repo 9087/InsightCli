@@ -80,17 +80,17 @@ bool ResolveCpuThreadFilterToTraceId(const FTraceContext& Context, const FString
 	}
 
 	FString DesiredThreadName;
-	if (ThreadFilter.Equals(TEXT("GameThread"), ESearchCase::IgnoreCase) || ThreadFilter == TEXT("42"))
+	if (ThreadFilter.Equals(TEXT("GameThread"), ESearchCase::IgnoreCase))
 	{
 		DesiredThreadName = TEXT("GameThread");
 		OutNormalizedThread = TEXT("GameThread");
 	}
-	else if (ThreadFilter.Equals(TEXT("RenderThread"), ESearchCase::IgnoreCase) || ThreadFilter == TEXT("43"))
+	else if (ThreadFilter.Equals(TEXT("RenderThread"), ESearchCase::IgnoreCase))
 	{
 		DesiredThreadName = TEXT("RenderThread");
 		OutNormalizedThread = TEXT("RenderThread");
 	}
-	else if (ThreadFilter.Equals(TEXT("RHIThread"), ESearchCase::IgnoreCase) || ThreadFilter == TEXT("44"))
+	else if (ThreadFilter.Equals(TEXT("RHIThread"), ESearchCase::IgnoreCase))
 	{
 		DesiredThreadName = TEXT("RHIThread");
 		OutNormalizedThread = TEXT("RHIThread");
