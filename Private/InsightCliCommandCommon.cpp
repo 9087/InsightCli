@@ -825,16 +825,64 @@ TSharedRef<FJsonObject> MakeInfoSummaryData(const FTraceContext& Context)
 {
 	const TArray<FFrameSample> Frames = BuildFrameSamples(Context);
 	const double DurationMs = (Context.TraceDurationMs > 0.0) ? Context.TraceDurationMs : (!Frames.IsEmpty() ? Frames.Last().FrameEndMs : 0.0);
+	const FString StartTimestamp = Context.TimeStamp.ToIso8601();
+	const FString EndTimestamp = (DurationMs > 0.0)
+		? (Context.TimeStamp + FTimespan::FromMilliseconds(DurationMs)).ToIso8601()
+		: TEXT("unavailable");
+
+	FString ThreadCount = TEXT("unavailable");
+	FString ThreadCountReason;
+	{
+		TSharedPtr<const TraceServices::IAnalysisSession> Session;
+		FString FailureStage;
+		FString FailureReason;
+		if (AcquireAnalysisSession(Context, Session, FailureStage, FailureReason))
+		{
+			int32 ThreadTotal = 0;
+			bool bHasThreadProvider = false;
+			{
+				TraceServices::FAnalysisSessionReadScope SessionReadScope(*Session.Get());
+				const TraceServices::IThreadProvider* ThreadProvider = Session->ReadProvider<TraceServices::IThreadProvider>(TraceServices::GetThreadProviderName());
+				if (ThreadProvider != nullptr)
+				{
+					bHasThreadProvider = true;
+					ThreadProvider->EnumerateThreads([&ThreadTotal](const TraceServices::FThreadInfo&)
+					{
+						++ThreadTotal;
+					});
+				}
+			}
+
+			if (bHasThreadProvider)
+			{
+				ThreadCount = FString::FromInt(ThreadTotal);
+			}
+			else
+			{
+				ThreadCountReason = TEXT("thread_provider_not_available");
+			}
+		}
+		else
+		{
+			ThreadCountReason = FString::Printf(TEXT("analysis_session_unavailable:%s:%s"), *FailureStage, *FailureReason);
+		}
+	}
 
 	const TSharedRef<FJsonObject> Data = MakeShared<FJsonObject>();
 	Data->SetStringField(TEXT("trace_name"), FPaths::GetCleanFilename(Context.FullPath));
 	Data->SetStringField(TEXT("trace_path"), Context.FullPath);
 	Data->SetStringField(TEXT("trace_size_bytes"), FString::Printf(TEXT("%lld"), Context.FileSize));
-	Data->SetStringField(TEXT("start_timestamp"), Context.TimeStamp.ToIso8601());
-	Data->SetStringField(TEXT("end_timestamp"), Context.TimeStamp.ToIso8601());
+	Data->SetStringField(TEXT("start_timestamp"), StartTimestamp);
+	Data->SetStringField(TEXT("start_timestamp_source"), TEXT("recorded_at_file_mtime"));
+	Data->SetStringField(TEXT("end_timestamp"), EndTimestamp);
 	Data->SetStringField(TEXT("duration_ms"), FString::Printf(TEXT("%.3f"), DurationMs));
-	Data->SetStringField(TEXT("thread_count"), TEXT("unavailable"));
+	Data->SetStringField(TEXT("thread_count"), ThreadCount);
+	if (!ThreadCountReason.IsEmpty())
+	{
+		Data->SetStringField(TEXT("thread_count_reason"), ThreadCountReason);
+	}
 	Data->SetStringField(TEXT("event_count"), TEXT("unavailable"));
+	Data->SetStringField(TEXT("event_count_reason"), TEXT("trace_event_count_not_exposed"));
 	Data->SetStringField(TEXT("data_source"), Context.bFrameSamplesTraceBacked ? TEXT("trace") : TEXT("unavailable"));
 	Data->SetNumberField(TEXT("game_frame_count"), Context.TraceGameFrameCount);
 	Data->SetNumberField(TEXT("rendering_frame_count"), Context.TraceRenderingFrameCount);
@@ -845,6 +893,7 @@ TSharedRef<FJsonObject> MakeInfoSummaryData(const FTraceContext& Context)
 	}
 	Data->SetStringField(TEXT("platform"), FPlatformProperties::IniPlatformName());
 	Data->SetStringField(TEXT("build_version"), TEXT("unavailable"));
+	Data->SetStringField(TEXT("build_version_reason"), TEXT("trace_build_version_not_exposed"));
 	return Data;
 }
 

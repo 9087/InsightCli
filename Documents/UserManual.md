@@ -103,10 +103,22 @@ Sample output:
   "data": {
     "trace_name": "run01.utrace",
     "trace_size_bytes": 120345678,
-    "timestamp_utc": "2026-05-02T16:08:28Z"
+    "start_timestamp": "2026-05-02T16:08:28Z",
+    "start_timestamp_source": "recorded_at_file_mtime",
+    "end_timestamp": "2026-05-02T16:08:32Z",
+    "duration_ms": "4220.000",
+    "thread_count": "14",
+    "event_count": "unavailable",
+    "event_count_reason": "trace_event_count_not_exposed",
+    "build_version": "unavailable",
+    "build_version_reason": "trace_build_version_not_exposed"
   }
 }
 ```
+
+Notes:
+- start_timestamp is derived from trace file mtime and is an approximate recording start marker.
+- end_timestamp is computed as start_timestamp + duration_ms; when duration_ms is zero, end_timestamp is unavailable.
 
 ## 5.2 `frames summary`
 

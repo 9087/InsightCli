@@ -194,7 +194,32 @@ function Invoke-NormalTraceSmoke {
 
     $preDetailCases = @(
         (New-SmokeCase -Message "[$([IO.Path]::GetFileName($TracePath))] Verify unknown compatibility option is rejected..." -Context 'info summary with extra format arg' -Args @($TracePath, 'info', 'summary', '--format', 'csv') -MustContain @('"E1003"', 'unknown_options') -ExpectNonZero),
-        (New-SmokeCase -Message "[$([IO.Path]::GetFileName($TracePath))] Verify normal JSON path still works..." -Context 'info summary' -Args @($TracePath, 'info', 'summary') -MustContain @('"data"', 'trace_name')),
+        (New-SmokeCase -Message "[$([IO.Path]::GetFileName($TracePath))] Verify normal JSON path still works..." -Context 'info summary' -Args @($TracePath, 'info', 'summary') -MustContain @('"data"', 'trace_name') -Validate {
+            param($result)
+            $json = Parse-JsonOutput -Text $result.Text -Context 'info summary'
+            if ($null -eq $json.data) {
+                throw 'Expected info summary response to include data object'
+            }
+            if ($null -eq $json.data.start_timestamp -or [string]::IsNullOrWhiteSpace([string]$json.data.start_timestamp)) {
+                throw 'Expected info summary to include start_timestamp'
+            }
+            if ($null -eq $json.data.duration_ms) {
+                throw 'Expected info summary to include duration_ms'
+            }
+
+            $durationMs = [double]$json.data.duration_ms
+            if ($durationMs -gt 0.0) {
+                if ($null -eq $json.data.end_timestamp -or [string]::IsNullOrWhiteSpace([string]$json.data.end_timestamp)) {
+                    throw 'Expected info summary to include non-empty end_timestamp when duration_ms > 0'
+                }
+                if ([string]$json.data.end_timestamp -eq [string]$json.data.start_timestamp) {
+                    throw 'Expected end_timestamp to differ from start_timestamp when duration_ms > 0'
+                }
+            }
+            elseif ([string]$json.data.end_timestamp -ne 'unavailable') {
+                throw 'Expected end_timestamp to be unavailable when duration_ms == 0'
+            }
+        }),
         (New-SmokeCase -Message "[$([IO.Path]::GetFileName($TracePath))] Verify frames summary returns timeline metrics..." -Context 'frames summary' -Args @($TracePath, 'frames', 'summary') -MustContain @('"data"', '"frame_count"')),
         (New-SmokeCase -Message "[$([IO.Path]::GetFileName($TracePath))] Verify frames slowest returns frame list..." -Context 'frames slowest' -Args @($TracePath, 'frames', 'slowest', '--limit', '3') -MustContain @('"data"', '"frame_index"'))
     )
