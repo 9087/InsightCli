@@ -139,12 +139,12 @@ bool HandleInfoAndFramesCommands(const FInsightCliRequest& Request, const FTrace
 		int32 FrameIndex = -1;
 		if (!TryGetIntOption(Request.Args, TEXT("--frame-index"), FrameIndex))
 		{
-			OutResponse = FInsightCliResponse::Error(4, TEXT("E1003"), TEXT("--frame-index is required for frames detail."));
+			OutResponse = MakeOptionError(TEXT("--frame-index is required for frames detail."));
 			return true;
 		}
 		if (FrameIndex < 0)
 		{
-			OutResponse = FInsightCliResponse::Error(4, TEXT("E1003"), TEXT("frame-index must be >= 0."));
+			OutResponse = MakeOptionError(TEXT("frame-index must be >= 0."));
 			return true;
 		}
 

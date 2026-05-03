@@ -1,6 +1,7 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
 #include "InsightCliCommandRegistry.h"
+#include "InsightCliCommandContext.h"
 #include "InsightCliTypes.h"
 #include "RequiredProgramMainCPPInclude.h"
 
@@ -35,7 +36,7 @@ bool ParseRequestFromArgv(int32 ArgC, TCHAR* ArgV[], UE::InsightCli::FInsightCli
 {
 	if (ArgC < 4)
 	{
-		OutErrorResponse = UE::InsightCli::FInsightCliResponse::Error(4, TEXT("E1003"), InvalidFormatMessage);
+		OutErrorResponse = UE::InsightCli::Internal::MakeOptionError(InvalidFormatMessage);
 		return false;
 	}
 

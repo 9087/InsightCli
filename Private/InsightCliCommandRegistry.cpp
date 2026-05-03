@@ -71,11 +71,7 @@ FInsightCliResponse ExecuteCommand(const FInsightCliRequest& Request)
 		TMap<FString, FString> Details;
 		Details.Add(TEXT("group"), Request.Group);
 		Details.Add(TEXT("action"), Request.Action);
-		return FInsightCliResponse::Error(
-			5,
-			TEXT("E2001"),
-			TEXT("Unknown command group/action."),
-			Details);
+		return MakeNotFoundError(TEXT("Unknown command group/action."), Details);
 	}
 
 	FInsightCliResponse Response;

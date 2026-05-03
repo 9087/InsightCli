@@ -40,7 +40,7 @@ bool HandleMarksCommands(const FInsightCliRequest& Request, const FTraceContext&
 		const bool bHasThreadIdFilter = TryGetIntOption(Request.Args, TEXT("--thread-id"), ThreadIdFilter);
 		if (bHasThreadIdFilter && ThreadIdFilter < 0)
 		{
-			OutResponse = FInsightCliResponse::Error(4, TEXT("E1003"), TEXT("thread-id must be >= 0."));
+			OutResponse = MakeOptionError(TEXT("thread-id must be >= 0."));
 			return true;
 		}
 
@@ -144,17 +144,17 @@ bool HandleMarksCommands(const FInsightCliRequest& Request, const FTraceContext&
 		double WindowMs = 0.0;
 		if (!TryGetDoubleOption(Request.Args, TEXT("--timestamp"), TimestampMs))
 		{
-			OutResponse = FInsightCliResponse::Error(4, TEXT("E1003"), TEXT("--timestamp is required for marks around."));
+			OutResponse = MakeOptionError(TEXT("--timestamp is required for marks around."));
 			return true;
 		}
 		if (!TryGetDoubleOption(Request.Args, TEXT("--window"), WindowMs))
 		{
-			OutResponse = FInsightCliResponse::Error(4, TEXT("E1003"), TEXT("--window is required for marks around."));
+			OutResponse = MakeOptionError(TEXT("--window is required for marks around."));
 			return true;
 		}
 		if (WindowMs < 0.0)
 		{
-			OutResponse = FInsightCliResponse::Error(4, TEXT("E1003"), TEXT("window must be >= 0."));
+			OutResponse = MakeOptionError(TEXT("window must be >= 0."));
 			return true;
 		}
 
@@ -168,7 +168,7 @@ bool HandleMarksCommands(const FInsightCliRequest& Request, const FTraceContext&
 		const bool bHasThreadIdFilter = TryGetIntOption(Request.Args, TEXT("--thread-id"), ThreadIdFilter);
 		if (bHasThreadIdFilter && ThreadIdFilter < 0)
 		{
-			OutResponse = FInsightCliResponse::Error(4, TEXT("E1003"), TEXT("thread-id must be >= 0."));
+			OutResponse = MakeOptionError(TEXT("thread-id must be >= 0."));
 			return true;
 		}
 

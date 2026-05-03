@@ -108,12 +108,12 @@ bool HandleCpuCommands(const FInsightCliRequest& Request, const FTraceContext& C
 		int32 FrameIndex = -1;
 		if (!TryGetIntOption(Request.Args, TEXT("--frame-index"), FrameIndex))
 		{
-			OutResponse = FInsightCliResponse::Error(4, TEXT("E1003"), TEXT("--frame-index is required for cpu stack."));
+			OutResponse = MakeOptionError(TEXT("--frame-index is required for cpu stack."));
 			return true;
 		}
 		if (FrameIndex < 0)
 		{
-			OutResponse = FInsightCliResponse::Error(4, TEXT("E1003"), TEXT("frame-index must be >= 0."));
+			OutResponse = MakeOptionError(TEXT("frame-index must be >= 0."));
 			return true;
 		}
 

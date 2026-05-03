@@ -24,7 +24,7 @@ void ApplyTimeWindowFilter(TArray<FFrameSample>& Frames, const TArray<FString>& 
 	bUsedWindow = true;
 	if (bHasStart && bHasEnd && Start > End)
 	{
-		OutError = FInsightCliResponse::Error(4, TEXT("E1003"), TEXT("time-start must be <= time-end."));
+		OutError = MakeOptionError(TEXT("time-start must be <= time-end."));
 		return;
 	}
 

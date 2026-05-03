@@ -244,7 +244,7 @@ bool ValidateNoUnknownOptionsWithGlobals(const TArray<FString>& Args, const TArr
 	UnknownOptions.Sort();
 	TMap<FString, FString> Details;
 	Details.Add(TEXT("unknown_options"), FString::Join(UnknownOptions, TEXT(",")));
-	OutError = FInsightCliResponse::Error(4, TEXT("E1003"), TEXT("Unknown option(s) for command."), Details);
+	OutError = MakeOptionError(TEXT("Unknown option(s) for command."), Details);
 	return false;
 }
 
@@ -257,13 +257,13 @@ bool TryGetLimitAndOptionalFrameIndexFilter(const TArray<FString>& Args, int32& 
 	const bool bHasLimit = TryGetIntOption(Args, TEXT("--limit"), OutLimit);
 	if (bHasLimit && OutLimit <= 0)
 	{
-		OutError = FInsightCliResponse::Error(4, TEXT("E1003"), TEXT("limit must be > 0."));
+		OutError = MakeOptionError(TEXT("limit must be > 0."));
 		return false;
 	}
 
 	if (bOutHasFrameIndex && OutFrameIndexFilter < 0)
 	{
-		OutError = FInsightCliResponse::Error(4, TEXT("E1003"), TEXT("frame-index must be >= 0."));
+		OutError = MakeOptionError(TEXT("frame-index must be >= 0."));
 		return false;
 	}
 
@@ -288,7 +288,7 @@ bool TryGetTimeWindowMs(const TArray<FString>& Args, FTimeWindowMs& OutWindow, F
 
 	if (OutWindow.StartMs.IsSet() && OutWindow.EndMs.IsSet() && OutWindow.StartMs.GetValue() > OutWindow.EndMs.GetValue())
 	{
-		OutError = FInsightCliResponse::Error(4, TEXT("E1003"), TEXT("time-start must be <= time-end."));
+		OutError = MakeOptionError(TEXT("time-start must be <= time-end."));
 		return false;
 	}
 
@@ -301,7 +301,7 @@ bool TryGetPositiveLimit(const TArray<FString>& Args, int32 DefaultLimit, int32&
 	const bool bHasLimit = TryGetIntOption(Args, TEXT("--limit"), OutLimit);
 	if (bHasLimit && OutLimit <= 0)
 	{
-		OutError = FInsightCliResponse::Error(4, TEXT("E1003"), TEXT("limit must be > 0."));
+		OutError = MakeOptionError(TEXT("limit must be > 0."));
 		return false;
 	}
 
@@ -315,10 +315,7 @@ bool RequireStringOption(const TArray<FString>& Args, const TCHAR* OptionName, c
 		return true;
 	}
 
-	OutError = FInsightCliResponse::Error(
-		4,
-		TEXT("E1003"),
-		FString::Printf(TEXT("%s is required for %s."), OptionName, OwnerCommand));
+	OutError = MakeOptionError(FString::Printf(TEXT("%s is required for %s."), OptionName, OwnerCommand));
 	return false;
 }
 }

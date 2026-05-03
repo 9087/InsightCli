@@ -185,6 +185,8 @@ bool TryGetPositiveLimit(const TArray<FString>& Args, int32 DefaultLimit, int32&
 bool RequireStringOption(const TArray<FString>& Args, const TCHAR* OptionName, const TCHAR* OwnerCommand, FString& OutValue, FInsightCliResponse& OutError);
 FString ToNumberString(double Value);
 TMap<FString, FString> MakeNotFoundMeta(const FInsightCliRequest& Request, const FString& Reason, const FString& QueryKey = TEXT(""), const FString& QueryValue = TEXT(""));
+FInsightCliResponse MakeOptionError(const FString& Message, const TMap<FString, FString>& Details = {});
+FInsightCliResponse MakeNotFoundError(const FString& Message, const TMap<FString, FString>& Details = {});
 
 // Trace/context bootstrap and shared frame data
 FInsightCliResponse ValidateTraceAndBuildContext(const FInsightCliRequest& Request, FTraceContext& OutContext);

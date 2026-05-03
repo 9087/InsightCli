@@ -132,6 +132,16 @@ TMap<FString, FString> MakeNotFoundMeta(const FInsightCliRequest& Request, const
 	return Meta;
 }
 
+FInsightCliResponse MakeOptionError(const FString& Message, const TMap<FString, FString>& Details)
+{
+	return FInsightCliResponse::Error(4, TEXT("E1003"), Message, Details);
+}
+
+FInsightCliResponse MakeNotFoundError(const FString& Message, const TMap<FString, FString>& Details)
+{
+	return FInsightCliResponse::Error(5, TEXT("E2001"), Message, Details);
+}
+
 FInsightCliResponse MakeTraceUnavailableError(
 	const FTraceContext& Context,
 	const TCHAR* Consumer,
@@ -161,7 +171,7 @@ FInsightCliResponse ValidateTraceAndBuildContext(const FInsightCliRequest& Reque
 {
 	if (Request.TracePath.IsEmpty())
 	{
-		return FInsightCliResponse::Error(4, TEXT("E1003"), TEXT("trace_path is required."));
+		return MakeOptionError(TEXT("trace_path is required."));
 	}
 
 	OutContext.FullPath = FPaths::ConvertRelativePathToFull(Request.TracePath);

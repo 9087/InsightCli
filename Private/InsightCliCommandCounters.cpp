@@ -122,7 +122,7 @@ bool ResolveCounterByName(
 		TMap<FString, FString> Details;
 		Details.Add(TEXT("name"), RequestedName);
 		Details.Add(TEXT("available_counters"), FString::Join(CounterNames, TEXT(",")));
-		OutError = FInsightCliResponse::Error(5, TEXT("E2001"), TEXT("Counter name not found."), Details);
+		OutError = MakeNotFoundError(TEXT("Counter name not found."), Details);
 		return false;
 	}
 
