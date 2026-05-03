@@ -52,11 +52,29 @@ bool HandleMarksCommands(const FInsightCliRequest& Request, const FTraceContext&
 			return true;
 		}
 
+		FMarksFilter Filter;
+		if (bHasCategoryFilter)
+		{
+			Filter.Category = CategoryFilter;
+		}
+		if (bHasChannelFilter)
+		{
+			Filter.Channel = ChannelFilter;
+		}
+		if (bHasThreadIdFilter)
+		{
+			Filter.ThreadId = ThreadIdFilter;
+		}
+		Filter.Keyword = Keyword;
+		Filter.bCaseSensitive = bCaseSensitive;
+		Filter.bExact = bExact;
+
 		TArray<FMarkSample> AllMarks;
 		FString FailureStage;
 		FString FailureReason;
 		if (!BuildMarks(
 			Context,
+			Filter,
 			AllMarks,
 			FailureStage,
 			FailureReason,
@@ -77,46 +95,7 @@ bool HandleMarksCommands(const FInsightCliRequest& Request, const FTraceContext&
 		TArray<TSharedPtr<FJsonValue>> Data;
 		for (const FMarkSample& Mark : AllMarks)
 		{
-			if (bHasCategoryFilter && !Mark.Category.Equals(CategoryFilter, ESearchCase::IgnoreCase))
-			{
-				continue;
-			}
-
-			if (bHasChannelFilter && !Mark.Channel.Equals(ChannelFilter, ESearchCase::IgnoreCase))
-			{
-				continue;
-			}
-
-			if (bHasThreadIdFilter && Mark.ThreadId != ThreadIdFilter)
-			{
-				continue;
-			}
-
-			if (TimeWindow.StartMs.IsSet() && Mark.TimestampMs < TimeWindow.StartMs.GetValue())
-			{
-				continue;
-			}
-
-			if (TimeWindow.EndMs.IsSet() && Mark.TimestampMs >= TimeWindow.EndMs.GetValue())
-			{
-				continue;
-			}
-
-			const FString Haystack = Mark.Message;
-			bool bMatched = false;
-			if (bExact)
-			{
-				bMatched = Haystack.Equals(Keyword, bCaseSensitive ? ESearchCase::CaseSensitive : ESearchCase::IgnoreCase);
-			}
-			else
-			{
-				bMatched = Haystack.Contains(Keyword, bCaseSensitive ? ESearchCase::CaseSensitive : ESearchCase::IgnoreCase);
-			}
-
-			if (bMatched)
-			{
-				Data.Add(MakeShared<FJsonValueObject>(MakeMarkObject(Mark)));
-			}
+			Data.Add(MakeShared<FJsonValueObject>(MakeMarkObject(Mark)));
 		}
 
 		TMap<FString, FString> Meta;
@@ -207,11 +186,26 @@ bool HandleMarksCommands(const FInsightCliRequest& Request, const FTraceContext&
 		const TOptional<double> RequestStart = TimeWindow.StartMs.IsSet() ? TOptional<double>(FMath::Max(Start, TimeWindow.StartMs.GetValue())) : TOptional<double>(Start);
 		const TOptional<double> RequestEnd = TimeWindow.EndMs.IsSet() ? TOptional<double>(FMath::Min(End, TimeWindow.EndMs.GetValue())) : TOptional<double>(End);
 
+		FMarksFilter Filter;
+		if (bHasCategoryFilter)
+		{
+			Filter.Category = CategoryFilter;
+		}
+		if (bHasChannelFilter)
+		{
+			Filter.Channel = ChannelFilter;
+		}
+		if (bHasThreadIdFilter)
+		{
+			Filter.ThreadId = ThreadIdFilter;
+		}
+
 		TArray<FMarkSample> AllMarks;
 		FString FailureStage;
 		FString FailureReason;
 		if (!BuildMarks(
 			Context,
+			Filter,
 			AllMarks,
 			FailureStage,
 			FailureReason,
@@ -232,36 +226,6 @@ bool HandleMarksCommands(const FInsightCliRequest& Request, const FTraceContext&
 		TArray<TSharedPtr<FJsonValue>> Data;
 		for (const FMarkSample& Mark : AllMarks)
 		{
-			if (Mark.TimestampMs < Start || Mark.TimestampMs >= End)
-			{
-				continue;
-			}
-
-			if (bHasCategoryFilter && !Mark.Category.Equals(CategoryFilter, ESearchCase::IgnoreCase))
-			{
-				continue;
-			}
-
-			if (bHasChannelFilter && !Mark.Channel.Equals(ChannelFilter, ESearchCase::IgnoreCase))
-			{
-				continue;
-			}
-
-			if (bHasThreadIdFilter && Mark.ThreadId != ThreadIdFilter)
-			{
-				continue;
-			}
-
-			if (TimeWindow.StartMs.IsSet() && Mark.TimestampMs < TimeWindow.StartMs.GetValue())
-			{
-				continue;
-			}
-
-			if (TimeWindow.EndMs.IsSet() && Mark.TimestampMs >= TimeWindow.EndMs.GetValue())
-			{
-				continue;
-			}
-
 			Data.Add(MakeShared<FJsonValueObject>(MakeMarkObject(Mark)));
 		}
 

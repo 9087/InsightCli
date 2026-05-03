@@ -153,6 +153,16 @@ struct FMarkSample
 	int32 ThreadId = 42;
 };
 
+struct FMarksFilter
+{
+	TOptional<FString> Category;
+	TOptional<FString> Channel;
+	TOptional<int32> ThreadId;
+	TOptional<FString> Keyword;
+	bool bCaseSensitive = false;
+	bool bExact = false;
+};
+
 struct FTimeWindowMs
 {
 	TOptional<double> StartMs;
@@ -293,6 +303,7 @@ TSharedRef<FJsonObject> MakeMemoryTagObject(const FMemoryTagSample& Tag);
 // JSON/data builders: marks
 bool BuildMarks(
 	const FTraceContext& Context,
+	const FMarksFilter& Filter,
 	TArray<FMarkSample>& OutMarks,
 	FString& OutFailureStage,
 	FString& OutFailureReason,
