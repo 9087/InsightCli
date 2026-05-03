@@ -236,6 +236,54 @@ function Invoke-NormalTraceSmoke {
                 }
             }
         }),
+        (New-SmokeCase -Message "[$([IO.Path]::GetFileName($TracePath))] Verify batch mode returns NDJSON in request order..." -Context 'batch mode ndjson' -Args @($TracePath, 'info', 'summary') -NoStep -Validate {
+            param($result)
+
+            $batchPath = Join-Path ([System.IO.Path]::GetTempPath()) ("insightcli-batch-" + [guid]::NewGuid().ToString() + ".json")
+            $batchJson = @'
+[
+  { "group": "info", "action": "summary" },
+  { "group": "frames", "action": "summary", "options": { "frame-range": "1:3" } },
+  { "group": "counters", "action": "stats", "options": { "name": "UnknownCounter" } }
+]
+'@
+
+            try {
+                Set-Content -Path $batchPath -Value $batchJson -Encoding utf8
+                $batchResult = Invoke-InsightCli -Args @($TracePath, '--batch', $batchPath)
+                if ($batchResult.ExitCode -eq 0) {
+                    throw 'Expected non-zero exit code for mixed batch with one invalid sub-command'
+                }
+
+                $lines = @($batchResult.Text -split "`r?`n" | Where-Object {
+                    $line = $_.Trim()
+                    return -not [string]::IsNullOrWhiteSpace($line) -and $line.StartsWith('{') -and $line.EndsWith('}')
+                })
+                if ($lines.Count -ne 3) {
+                    throw "Expected 3 NDJSON lines from batch, got $($lines.Count)"
+                }
+
+                $first = Parse-JsonOutput -Text $lines[0] -Context 'batch line 1'
+                if ($null -eq $first.data -or [string]::IsNullOrWhiteSpace([string]$first.data.trace_name)) {
+                    throw 'Expected batch first line to be info summary envelope'
+                }
+
+                $second = Parse-JsonOutput -Text $lines[1] -Context 'batch line 2'
+                if ($second.meta.time_window_source -ne 'frame-range') {
+                    throw 'Expected batch second line to include frame-range window metadata'
+                }
+
+                $third = Parse-JsonOutput -Text $lines[2] -Context 'batch line 3'
+                if ($third.code -ne 'E2001') {
+                    throw 'Expected batch third line to be error envelope with E2001'
+                }
+            }
+            finally {
+                if (Test-Path -Path $batchPath) {
+                    Remove-Item -Path $batchPath -Force -ErrorAction SilentlyContinue
+                }
+            }
+        }),
         (New-SmokeCase -Message "[$([IO.Path]::GetFileName($TracePath))] Verify frames summary returns timeline metrics..." -Context 'frames summary' -Args @($TracePath, 'frames', 'summary') -MustContain @('"data"', '"frame_count"')),
         (New-SmokeCase -Message "[$([IO.Path]::GetFileName($TracePath))] Verify frames summary supports frame-range window..." -Context 'frames summary frame-range' -Args @($TracePath, 'frames', 'summary', '--frame-range', '1:3') -MustContain @('"data"', '"time_window_source"') -Validate {
             param($result)

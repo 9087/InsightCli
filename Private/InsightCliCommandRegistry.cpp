@@ -55,17 +55,9 @@ const FCommandCatalogEntry* FindCatalogEntry(const FInsightCliRequest& Request)
 
 	return nullptr;
 }
-}
 
-FInsightCliResponse ExecuteCommand(const FInsightCliRequest& Request)
+FInsightCliResponse ExecuteResolvedCommand(const FInsightCliRequest& Request, const FTraceContext& Context)
 {
-	FTraceContext Context;
-	FInsightCliResponse ValidationError = ValidateTraceAndBuildContext(Request, Context);
-	if (ValidationError.ExitCode != 0)
-	{
-		return ValidationError;
-	}
-
 	const FCommandCatalogEntry* Entry = FindCatalogEntry(Request);
 	if (Entry == nullptr)
 	{
@@ -89,5 +81,23 @@ FInsightCliResponse ExecuteCommand(const FInsightCliRequest& Request)
 		TEXT("E3001"),
 		TEXT("Command catalog/handler mismatch."),
 		Details);
+}
+}
+
+FInsightCliResponse ExecuteCommand(const FInsightCliRequest& Request)
+{
+	FTraceContext Context;
+	FInsightCliResponse ValidationError = ValidateTraceAndBuildContext(Request, Context);
+	if (ValidationError.ExitCode != 0)
+	{
+		return ValidationError;
+	}
+
+	return ExecuteResolvedCommand(Request, Context);
+}
+
+FInsightCliResponse ExecuteCommandWithSharedContext(const FInsightCliRequest& Request, const Internal::FTraceContext& SharedContext)
+{
+	return ExecuteResolvedCommand(Request, SharedContext);
 }
 }

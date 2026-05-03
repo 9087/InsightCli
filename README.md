@@ -24,6 +24,7 @@ Run:
 
 ```powershell
 Engine/Binaries/Win64/InsightCli.exe <trace_path> <group> <action> [options]
+Engine/Binaries/Win64/InsightCli.exe <trace_path> --batch <commands.json|->
 ```
 
 Example:
@@ -55,7 +56,26 @@ InsightCli.exe <trace_path> marks search --keyword load
 
 # List enabled/known trace channels
 InsightCli.exe <trace_path> info channels
+
+# Run multiple commands in one process (NDJSON output)
+InsightCli.exe <trace_path> --batch commands.json
 ```
+
+Batch file example:
+
+```json
+[
+	{ "group": "frames", "action": "slowest", "options": { "limit": 5 } },
+	{ "group": "cpu", "action": "top", "options": { "thread": "GameThread", "limit": 10 } }
+]
+```
+
+Batch behavior:
+
+- Output is NDJSON on stdout (one envelope per command, in request order).
+- Batch continues after individual command failures.
+- Process exit code is the max exit code among sub-commands.
+- Use `--batch -` to read batch JSON from stdin.
 
 ## Output Contract
 
