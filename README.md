@@ -109,6 +109,7 @@ powershell -ExecutionPolicy Bypass -File Engine/Source/Programs/InsightCli/Tools
 
 - Start with `frames summary` to estimate baseline frame quality before drilling down.
 - Use `--limit` to keep results compact when scripting.
+- For time-scoped analysis, use either `--time-start/--time-end` or `--frame-range <start:end>` (mutually exclusive).
 - For incident analysis, combine `frames slowest` -> `cpu/gpu` -> `threads/tasks` in that order.
 - Treat CLI output as structured data first (JSON parsing) rather than plain text.
 - Startup performance is currently considered good enough; use the perf compare script for periodic regression checks instead of continuous micro-optimization.

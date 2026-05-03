@@ -9,28 +9,15 @@
 
 namespace UE::InsightCli::Internal
 {
-void ApplyTimeWindowFilter(TArray<FFrameSample>& Frames, const TArray<FString>& Args, bool& bUsedWindow, FInsightCliResponse& OutError)
+void ApplyTimeWindowFilter(TArray<FFrameSample>& Frames, const FResolvedTimeWindowMs& TimeWindow)
 {
-	bUsedWindow = false;
-	double Start = 0.0;
-	double End = 0.0;
-	const bool bHasStart = TryGetDoubleOption(Args, TEXT("--time-start"), Start);
-	const bool bHasEnd = TryGetDoubleOption(Args, TEXT("--time-end"), End);
-
-	if (!bHasStart && !bHasEnd)
+	if (!TimeWindow.IsSet())
 	{
 		return;
 	}
 
-	bUsedWindow = true;
-	if (bHasStart && bHasEnd && Start > End)
-	{
-		OutError = MakeOptionError(TEXT("time-start must be <= time-end."));
-		return;
-	}
-
-	const double EffectiveStart = bHasStart ? Start : 0.0;
-	const double EffectiveEnd = bHasEnd ? End : TNumericLimits<double>::Max();
+	const double EffectiveStart = TimeWindow.StartMs.IsSet() ? TimeWindow.StartMs.GetValue() : 0.0;
+	const double EffectiveEnd = TimeWindow.EndMs.IsSet() ? TimeWindow.EndMs.GetValue() : TNumericLimits<double>::Max();
 	Frames = Frames.FilterByPredicate([EffectiveStart, EffectiveEnd](const FFrameSample& Sample)
 	{
 		return Sample.FrameStartMs >= EffectiveStart && Sample.FrameStartMs < EffectiveEnd;

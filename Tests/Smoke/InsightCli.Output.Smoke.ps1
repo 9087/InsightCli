@@ -237,6 +237,17 @@ function Invoke-NormalTraceSmoke {
             }
         }),
         (New-SmokeCase -Message "[$([IO.Path]::GetFileName($TracePath))] Verify frames summary returns timeline metrics..." -Context 'frames summary' -Args @($TracePath, 'frames', 'summary') -MustContain @('"data"', '"frame_count"')),
+        (New-SmokeCase -Message "[$([IO.Path]::GetFileName($TracePath))] Verify frames summary supports frame-range window..." -Context 'frames summary frame-range' -Args @($TracePath, 'frames', 'summary', '--frame-range', '1:3') -MustContain @('"data"', '"time_window_source"') -Validate {
+            param($result)
+            $json = Parse-JsonOutput -Text $result.Text -Context 'frames summary frame-range'
+            if ($json.meta.time_window_source -ne 'frame-range') {
+                throw 'Expected frames summary frame-range meta.time_window_source=frame-range'
+            }
+            if ($json.meta.frame_range -ne '1:3') {
+                throw 'Expected frames summary frame-range metadata echo'
+            }
+        }),
+        (New-SmokeCase -Message "[$([IO.Path]::GetFileName($TracePath))] Verify frame-range cannot be combined with explicit time window..." -Context 'frames summary frame-range conflict' -Args @($TracePath, 'frames', 'summary', '--frame-range', '1:3', '--time-start', '0') -MustContain @('"E1003"') -ExpectNonZero),
         (New-SmokeCase -Message "[$([IO.Path]::GetFileName($TracePath))] Verify frames slowest returns frame list..." -Context 'frames slowest' -Args @($TracePath, 'frames', 'slowest', '--limit', '3') -MustContain @('"data"', '"frame_index"'))
     )
 
@@ -402,6 +413,15 @@ function Invoke-NormalTraceSmoke {
             if ($seriesJson.data.Count -gt 1) {
                 Assert-Ascending -Items $seriesJson.data -Property 'timestamp_ms' -Context 'counters series'
             }
+
+            $seriesRangeResult = Invoke-InsightCli -Args @($TracePath, 'counters', 'series', '--name', $counterName, '--frame-range', '1:3')
+            if ($seriesRangeResult.ExitCode -ne 0) {
+                throw 'Expected counters series to succeed with frame-range'
+            }
+            $seriesRangeJson = Parse-JsonOutput -Text $seriesRangeResult.Text -Context 'counters series frame-range'
+            if ($seriesRangeJson.meta.time_window_source -ne 'frame-range') {
+                throw 'Expected counters series frame-range meta.time_window_source=frame-range'
+            }
         }),
         (New-SmokeCase -Message "[$([IO.Path]::GetFileName($TracePath))] Verify counters stats returns aggregate stats..." -Context 'counters stats' -Args @($TracePath, 'counters', 'list') -MustContain @('"data"') -Validate {
             param($result)
@@ -476,10 +496,22 @@ function Invoke-NormalTraceSmoke {
             if ($summaryJson.meta.data_source -ne 'trace') {
                 throw 'Expected memory summary meta.data_source=trace'
             }
+            if ($summaryJson.meta.time_window_source -ne 'full') {
+                throw 'Expected memory summary default time_window_source=full'
+            }
             foreach ($field in @('min_bytes','max_bytes','avg_bytes','end_bytes')) {
                 if ($null -eq $summaryJson.data.$field) {
                     throw "Expected memory summary field: $field"
                 }
+            }
+
+            $memorySummaryRangeResult = Invoke-InsightCli -Args @($TracePath, 'memory', 'summary', '--frame-range', '1:3')
+            if ($memorySummaryRangeResult.ExitCode -ne 0) {
+                throw 'Expected zero exit code for memory summary frame-range'
+            }
+            $summaryRangeJson = Parse-JsonOutput -Text $memorySummaryRangeResult.Text -Context 'memory summary frame-range'
+            if ($summaryRangeJson.meta.time_window_source -ne 'frame-range') {
+                throw 'Expected memory summary frame-range meta.time_window_source=frame-range'
             }
 
             $memoryPeakResult = Invoke-InsightCli -Args @($TracePath, 'memory', 'peak')
@@ -564,13 +596,22 @@ function Invoke-NormalTraceSmoke {
                 throw 'Expected zero exit code for marks search with time window'
             }
             $windowedSearchJson = Parse-JsonOutput -Text $windowedSearchResult.Text -Context 'marks search with time window'
-            if ($windowedSearchJson.meta.filter_time_start -ne '0.000' -or $windowedSearchJson.meta.filter_time_end -ne '5000.000') {
-                throw 'Expected marks search time window filters in meta'
+            if ($windowedSearchJson.meta.time_window_source -ne 'explicit' -or $windowedSearchJson.meta.time_window_start_ms -ne '0.000' -or $windowedSearchJson.meta.time_window_end_ms -ne '5000.000') {
+                throw 'Expected marks search explicit time window metadata'
             }
             foreach ($row in $windowedSearchJson.data) {
                 if ([double]$row.timestamp_ms -lt 0 -or [double]$row.timestamp_ms -ge 5000) {
                     throw 'Expected marks search rows to respect [time-start, time-end) window'
                 }
+            }
+
+            $frameRangeSearchResult = Invoke-InsightCli -Args @($TracePath, 'marks', 'search', '--keyword', 'a', '--frame-range', '1:3')
+            if ($frameRangeSearchResult.ExitCode -ne 0) {
+                throw 'Expected zero exit code for marks search with frame-range'
+            }
+            $frameRangeSearchJson = Parse-JsonOutput -Text $frameRangeSearchResult.Text -Context 'marks search with frame-range'
+            if ($frameRangeSearchJson.meta.time_window_source -ne 'frame-range' -or $frameRangeSearchJson.meta.frame_range -ne '1:3') {
+                throw 'Expected marks search frame-range metadata'
             }
         })
     )

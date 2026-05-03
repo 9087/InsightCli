@@ -173,6 +173,25 @@ struct FTimeWindowMs
 	}
 };
 
+struct FFrameRange
+{
+	int32 StartInclusive = 0;
+	int32 EndExclusive = 0;
+};
+
+struct FResolvedTimeWindowMs
+{
+	TOptional<double> StartMs;
+	TOptional<double> EndMs;
+	FString Source = TEXT("full");
+	TOptional<FFrameRange> FrameRange;
+
+	bool IsSet() const
+	{
+		return StartMs.IsSet() || EndMs.IsSet();
+	}
+};
+
 // Option parsing helpers
 bool TryGetIntOption(const TArray<FString>& Args, const TCHAR* LongName, int32& OutValue);
 bool TryGetDoubleOption(const TArray<FString>& Args, const TCHAR* LongName, double& OutValue);
@@ -181,6 +200,8 @@ bool HasOption(const TArray<FString>& Args, const TCHAR* LongName);
 bool ValidateNoUnknownOptionsWithGlobals(const TArray<FString>& Args, const TArray<FString>& CommandOptionNames, FInsightCliResponse& OutError);
 bool TryGetLimitAndOptionalFrameIndexFilter(const TArray<FString>& Args, int32& OutLimit, int32& OutFrameIndexFilter, bool& bOutHasFrameIndex, FInsightCliResponse& OutError);
 bool TryGetTimeWindowMs(const TArray<FString>& Args, FTimeWindowMs& OutWindow, FInsightCliResponse& OutError);
+bool TryResolveTimeWindowMs(const FTraceContext& Context, const TArray<FString>& Args, bool bAllowFrameRange, FResolvedTimeWindowMs& OutWindow, FInsightCliResponse& OutError);
+void AppendTimeWindowMeta(const FResolvedTimeWindowMs& TimeWindow, TMap<FString, FString>& OutMeta);
 bool TryGetPositiveLimit(const TArray<FString>& Args, int32 DefaultLimit, int32& OutLimit, FInsightCliResponse& OutError);
 bool RequireStringOption(const TArray<FString>& Args, const TCHAR* OptionName, const TCHAR* OwnerCommand, FString& OutValue, FInsightCliResponse& OutError);
 FString ToNumberString(double Value);
@@ -206,7 +227,7 @@ bool AcquireAnalysisSession(
 	FString& OutFailureReason);
 TArray<FFrameSample> BuildFrameSamples(const FTraceContext& Context);
 bool EnsureTraceBackedFrameSamples(const FTraceContext& Context, FInsightCliResponse& OutError, const FString& ConsumerTag);
-void ApplyTimeWindowFilter(TArray<FFrameSample>& Frames, const TArray<FString>& Args, bool& bUsedWindow, FInsightCliResponse& OutError);
+void ApplyTimeWindowFilter(TArray<FFrameSample>& Frames, const FResolvedTimeWindowMs& TimeWindow);
 
 // JSON builders: info + frames
 TSharedRef<FJsonObject> MakeInfoSummaryData(const FTraceContext& Context);

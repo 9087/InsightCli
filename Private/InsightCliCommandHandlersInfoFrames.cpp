@@ -36,9 +36,17 @@ bool HandleInfoAndFramesCommands(const FInsightCliRequest& Request, const FTrace
 	if (Request.Group == TEXT("frames") && Request.Action == TEXT("summary"))
 	{
 		FInsightCliResponse UnknownOptionError;
-		if (!ValidateNoUnknownOptionsWithGlobals(Request.Args, { TEXT("time-start"), TEXT("time-end") }, UnknownOptionError))
+		if (!ValidateNoUnknownOptionsWithGlobals(Request.Args, { TEXT("time-start"), TEXT("time-end"), TEXT("frame-range") }, UnknownOptionError))
 		{
 			OutResponse = UnknownOptionError;
+			return true;
+		}
+
+		FResolvedTimeWindowMs TimeWindow;
+		FInsightCliResponse TimeWindowError;
+		if (!TryResolveTimeWindowMs(Context, Request.Args, true, TimeWindow, TimeWindowError))
+		{
+			OutResponse = TimeWindowError;
 			return true;
 		}
 
@@ -50,32 +58,13 @@ bool HandleInfoAndFramesCommands(const FInsightCliRequest& Request, const FTrace
 		}
 
 		TArray<FFrameSample> Frames = BuildFrameSamples(Context);
-		bool bUsedWindow = false;
-		FInsightCliResponse WindowError;
-		ApplyTimeWindowFilter(Frames, Request.Args, bUsedWindow, WindowError);
-		if (WindowError.ExitCode != 0)
-		{
-			OutResponse = WindowError;
-			return true;
-		}
+		ApplyTimeWindowFilter(Frames, TimeWindow);
 
 		TMap<FString, FString> Meta;
 		Meta.Add(TEXT("data_source"), Context.bFrameSamplesTraceBacked ? TEXT("trace") : TEXT("unavailable"));
 		Meta.Add(TEXT("game_frame_count"), FString::FromInt(Context.TraceGameFrameCount));
 		Meta.Add(TEXT("rendering_frame_count"), FString::FromInt(Context.TraceRenderingFrameCount));
-		if (bUsedWindow)
-		{
-			double Start = 0.0;
-			double End = 0.0;
-			if (TryGetDoubleOption(Request.Args, TEXT("--time-start"), Start))
-			{
-				Meta.Add(TEXT("time_start_ms"), ToNumberString(Start));
-			}
-			if (TryGetDoubleOption(Request.Args, TEXT("--time-end"), End))
-			{
-				Meta.Add(TEXT("time_end_ms"), ToNumberString(End));
-			}
-		}
+		AppendTimeWindowMeta(TimeWindow, Meta);
 
 		OutResponse = FInsightCliResponse::Ok(MakeEnvelopeWithObject(MakeFramesSummaryData(Frames), Meta));
 		return true;
@@ -84,9 +73,17 @@ bool HandleInfoAndFramesCommands(const FInsightCliRequest& Request, const FTrace
 	if (Request.Group == TEXT("frames") && Request.Action == TEXT("slowest"))
 	{
 		FInsightCliResponse UnknownOptionError;
-		if (!ValidateNoUnknownOptionsWithGlobals(Request.Args, { TEXT("limit"), TEXT("time-start"), TEXT("time-end") }, UnknownOptionError))
+		if (!ValidateNoUnknownOptionsWithGlobals(Request.Args, { TEXT("limit"), TEXT("time-start"), TEXT("time-end"), TEXT("frame-range") }, UnknownOptionError))
 		{
 			OutResponse = UnknownOptionError;
+			return true;
+		}
+
+		FResolvedTimeWindowMs TimeWindow;
+		FInsightCliResponse TimeWindowError;
+		if (!TryResolveTimeWindowMs(Context, Request.Args, true, TimeWindow, TimeWindowError))
+		{
+			OutResponse = TimeWindowError;
 			return true;
 		}
 
@@ -106,14 +103,7 @@ bool HandleInfoAndFramesCommands(const FInsightCliRequest& Request, const FTrace
 		}
 
 		TArray<FFrameSample> Frames = BuildFrameSamples(Context);
-		bool bUsedWindow = false;
-		FInsightCliResponse WindowError;
-		ApplyTimeWindowFilter(Frames, Request.Args, bUsedWindow, WindowError);
-		if (WindowError.ExitCode != 0)
-		{
-			OutResponse = WindowError;
-			return true;
-		}
+		ApplyTimeWindowFilter(Frames, TimeWindow);
 
 		Frames.Sort([](const FFrameSample& A, const FFrameSample& B)
 		{
@@ -137,6 +127,7 @@ bool HandleInfoAndFramesCommands(const FInsightCliRequest& Request, const FTrace
 		Meta.Add(TEXT("data_source"), Context.bFrameSamplesTraceBacked ? TEXT("trace") : TEXT("unavailable"));
 		Meta.Add(TEXT("game_frame_count"), FString::FromInt(Context.TraceGameFrameCount));
 		Meta.Add(TEXT("rendering_frame_count"), FString::FromInt(Context.TraceRenderingFrameCount));
+		AppendTimeWindowMeta(TimeWindow, Meta);
 		OutResponse = FInsightCliResponse::Ok(MakeEnvelopeWithArray(Data, Meta));
 		return true;
 	}

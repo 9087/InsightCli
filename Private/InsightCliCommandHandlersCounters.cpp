@@ -54,7 +54,7 @@ bool HandleCountersCommands(const FInsightCliRequest& Request, const FTraceConte
 	if (Request.Group == TEXT("counters") && Request.Action == TEXT("series"))
 	{
 		FInsightCliResponse UnknownOptionError;
-		if (!ValidateNoUnknownOptionsWithGlobals(Request.Args, { TEXT("name"), TEXT("time-start"), TEXT("time-end") }, UnknownOptionError))
+		if (!ValidateNoUnknownOptionsWithGlobals(Request.Args, { TEXT("name"), TEXT("time-start"), TEXT("time-end"), TEXT("frame-range") }, UnknownOptionError))
 		{
 			OutResponse = UnknownOptionError;
 			return true;
@@ -76,9 +76,9 @@ bool HandleCountersCommands(const FInsightCliRequest& Request, const FTraceConte
 			return true;
 		}
 
-		FTimeWindowMs TimeWindow;
+		FResolvedTimeWindowMs TimeWindow;
 		FInsightCliResponse TimeWindowError;
-		if (!TryGetTimeWindowMs(Request.Args, TimeWindow, TimeWindowError))
+		if (!TryResolveTimeWindowMs(Context, Request.Args, true, TimeWindow, TimeWindowError))
 		{
 			OutResponse = TimeWindowError;
 			return true;
@@ -127,14 +127,7 @@ bool HandleCountersCommands(const FInsightCliRequest& Request, const FTraceConte
 		Meta.Add(TEXT("counter_type"), CounterType);
 		Meta.Add(TEXT("counter_unit"), CounterUnit);
 		Meta.Add(TEXT("data_source"), TEXT("trace"));
-		if (TimeWindow.StartMs.IsSet())
-		{
-			Meta.Add(TEXT("filter_time_start"), ToNumberString(TimeWindow.StartMs.GetValue()));
-		}
-		if (TimeWindow.EndMs.IsSet())
-		{
-			Meta.Add(TEXT("filter_time_end"), ToNumberString(TimeWindow.EndMs.GetValue()));
-		}
+		AppendTimeWindowMeta(TimeWindow, Meta);
 		OutResponse = FInsightCliResponse::Ok(MakeEnvelopeWithArray(Data, Meta));
 		return true;
 	}

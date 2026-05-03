@@ -168,6 +168,71 @@ bool TryParseInt(const FString& Text, int32& OutValue)
 	OutValue = static_cast<int32>(Parsed);
 	return true;
 }
+
+bool TryParseFrameRange(const FString& Text, FFrameRange& OutRange)
+{
+	const int32 ColonPos = Text.Find(TEXT(":"));
+	if (ColonPos <= 0 || ColonPos >= Text.Len() - 1)
+	{
+		return false;
+	}
+
+	const FString StartText = Text.Left(ColonPos);
+	const FString EndText = Text.Mid(ColonPos + 1);
+
+	int32 Start = 0;
+	int32 End = 0;
+	if (!TryParseInt(StartText, Start) || !TryParseInt(EndText, End))
+	{
+		return false;
+	}
+	if (Start < 0 || End < 0 || End < Start)
+	{
+		return false;
+	}
+
+	OutRange.StartInclusive = Start;
+	OutRange.EndExclusive = End;
+	return true;
+}
+
+void ResolveFrameRangeToTimeWindow(const TArray<FFrameSample>& Frames, const FFrameRange& FrameRange, TOptional<double>& OutStartMs, TOptional<double>& OutEndMs)
+{
+	bool bFound = false;
+	double StartMs = 0.0;
+	double EndMs = 0.0;
+
+	for (const FFrameSample& Sample : Frames)
+	{
+		if (Sample.FrameIndex < FrameRange.StartInclusive || Sample.FrameIndex >= FrameRange.EndExclusive)
+		{
+			continue;
+		}
+
+		if (!bFound)
+		{
+			bFound = true;
+			StartMs = Sample.FrameStartMs;
+			EndMs = Sample.FrameEndMs;
+		}
+		else
+		{
+			StartMs = FMath::Min(StartMs, Sample.FrameStartMs);
+			EndMs = FMath::Max(EndMs, Sample.FrameEndMs);
+		}
+	}
+
+	if (bFound)
+	{
+		OutStartMs = StartMs;
+		OutEndMs = EndMs;
+		return;
+	}
+
+	// An empty frame range maps to an empty time window.
+	OutStartMs = 0.0;
+	OutEndMs = 0.0;
+}
 }
 
 bool TryGetIntOption(const TArray<FString>& Args, const TCHAR* LongName, int32& OutValue)
@@ -293,6 +358,86 @@ bool TryGetTimeWindowMs(const TArray<FString>& Args, FTimeWindowMs& OutWindow, F
 	}
 
 	return true;
+}
+
+bool TryResolveTimeWindowMs(const FTraceContext& Context, const TArray<FString>& Args, bool bAllowFrameRange, FResolvedTimeWindowMs& OutWindow, FInsightCliResponse& OutError)
+{
+	OutWindow = {};
+
+	const bool bHasTimeStart = HasOption(Args, TEXT("--time-start"));
+	const bool bHasTimeEnd = HasOption(Args, TEXT("--time-end"));
+	const bool bHasFrameRange = HasOption(Args, TEXT("--frame-range"));
+
+	if (bHasFrameRange && !bAllowFrameRange)
+	{
+		OutError = MakeOptionError(TEXT("frame-range is not supported for this command."));
+		return false;
+	}
+
+	if (bHasFrameRange && (bHasTimeStart || bHasTimeEnd))
+	{
+		OutError = MakeOptionError(TEXT("frame-range cannot be combined with time-start/time-end."));
+		return false;
+	}
+
+	if (bHasFrameRange)
+	{
+		FString FrameRangeText;
+		if (!TryGetStringOption(Args, TEXT("--frame-range"), FrameRangeText))
+		{
+			OutError = MakeOptionError(TEXT("frame-range requires <start:end> value, for example --frame-range 10:20."));
+			return false;
+		}
+
+		FFrameRange FrameRange;
+		if (!TryParseFrameRange(FrameRangeText, FrameRange))
+		{
+			OutError = MakeOptionError(TEXT("frame-range must match <start:end> with non-negative integers and end >= start."));
+			return false;
+		}
+
+		FInsightCliResponse FrameGuardError;
+		if (!EnsureTraceBackedFrameSamples(Context, FrameGuardError, TEXT("time_window.frame_range")))
+		{
+			OutError = FrameGuardError;
+			return false;
+		}
+
+		const TArray<FFrameSample> Frames = BuildFrameSamples(Context);
+		ResolveFrameRangeToTimeWindow(Frames, FrameRange, OutWindow.StartMs, OutWindow.EndMs);
+		OutWindow.FrameRange = FrameRange;
+		OutWindow.Source = TEXT("frame-range");
+		return true;
+	}
+
+	FTimeWindowMs ExplicitWindow;
+	if (!TryGetTimeWindowMs(Args, ExplicitWindow, OutError))
+	{
+		return false;
+	}
+
+	OutWindow.StartMs = ExplicitWindow.StartMs;
+	OutWindow.EndMs = ExplicitWindow.EndMs;
+	OutWindow.Source = ExplicitWindow.IsSet() ? TEXT("explicit") : TEXT("full");
+	return true;
+}
+
+void AppendTimeWindowMeta(const FResolvedTimeWindowMs& TimeWindow, TMap<FString, FString>& OutMeta)
+{
+	OutMeta.Add(TEXT("time_window_source"), TimeWindow.Source);
+	if (TimeWindow.StartMs.IsSet())
+	{
+		OutMeta.Add(TEXT("time_window_start_ms"), ToNumberString(TimeWindow.StartMs.GetValue()));
+	}
+	if (TimeWindow.EndMs.IsSet())
+	{
+		OutMeta.Add(TEXT("time_window_end_ms"), ToNumberString(TimeWindow.EndMs.GetValue()));
+	}
+	if (TimeWindow.FrameRange.IsSet())
+	{
+		const FFrameRange& FrameRange = TimeWindow.FrameRange.GetValue();
+		OutMeta.Add(TEXT("frame_range"), FString::Printf(TEXT("%d:%d"), FrameRange.StartInclusive, FrameRange.EndExclusive));
+	}
 }
 
 bool TryGetPositiveLimit(const TArray<FString>& Args, int32 DefaultLimit, int32& OutLimit, FInsightCliResponse& OutError)

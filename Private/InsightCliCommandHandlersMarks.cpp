@@ -12,7 +12,7 @@ bool HandleMarksCommands(const FInsightCliRequest& Request, const FTraceContext&
 		FInsightCliResponse UnknownOptionError;
 		if (!ValidateNoUnknownOptionsWithGlobals(
 			Request.Args,
-			{ TEXT("keyword"), TEXT("case-sensitive"), TEXT("exact"), TEXT("category"), TEXT("channel"), TEXT("thread-id"), TEXT("time-start"), TEXT("time-end") },
+			{ TEXT("keyword"), TEXT("case-sensitive"), TEXT("exact"), TEXT("category"), TEXT("channel"), TEXT("thread-id"), TEXT("time-start"), TEXT("time-end"), TEXT("frame-range") },
 			UnknownOptionError))
 		{
 			OutResponse = UnknownOptionError;
@@ -44,9 +44,9 @@ bool HandleMarksCommands(const FInsightCliRequest& Request, const FTraceContext&
 			return true;
 		}
 
-		FTimeWindowMs TimeWindow;
+		FResolvedTimeWindowMs TimeWindow;
 		FInsightCliResponse TimeWindowError;
-		if (!TryGetTimeWindowMs(Request.Args, TimeWindow, TimeWindowError))
+		if (!TryResolveTimeWindowMs(Context, Request.Args, true, TimeWindow, TimeWindowError))
 		{
 			OutResponse = TimeWindowError;
 			return true;
@@ -114,14 +114,7 @@ bool HandleMarksCommands(const FInsightCliRequest& Request, const FTraceContext&
 		{
 			Meta.Add(TEXT("filter_thread_id"), FString::FromInt(ThreadIdFilter));
 		}
-		if (TimeWindow.StartMs.IsSet())
-		{
-			Meta.Add(TEXT("filter_time_start"), ToNumberString(TimeWindow.StartMs.GetValue()));
-		}
-		if (TimeWindow.EndMs.IsSet())
-		{
-			Meta.Add(TEXT("filter_time_end"), ToNumberString(TimeWindow.EndMs.GetValue()));
-		}
+		AppendTimeWindowMeta(TimeWindow, Meta);
 		Meta.Add(TEXT("data_source"), TEXT("trace"));
 
 		OutResponse = FInsightCliResponse::Ok(MakeEnvelopeWithArray(Data, Meta));
@@ -133,7 +126,7 @@ bool HandleMarksCommands(const FInsightCliRequest& Request, const FTraceContext&
 		FInsightCliResponse UnknownOptionError;
 		if (!ValidateNoUnknownOptionsWithGlobals(
 			Request.Args,
-			{ TEXT("timestamp"), TEXT("window"), TEXT("category"), TEXT("channel"), TEXT("thread-id"), TEXT("time-start"), TEXT("time-end") },
+			{ TEXT("timestamp"), TEXT("window"), TEXT("category"), TEXT("channel"), TEXT("thread-id"), TEXT("time-start"), TEXT("time-end"), TEXT("frame-range") },
 			UnknownOptionError))
 		{
 			OutResponse = UnknownOptionError;
@@ -172,9 +165,9 @@ bool HandleMarksCommands(const FInsightCliRequest& Request, const FTraceContext&
 			return true;
 		}
 
-		FTimeWindowMs TimeWindow;
+		FResolvedTimeWindowMs TimeWindow;
 		FInsightCliResponse TimeWindowError;
-		if (!TryGetTimeWindowMs(Request.Args, TimeWindow, TimeWindowError))
+		if (!TryResolveTimeWindowMs(Context, Request.Args, true, TimeWindow, TimeWindowError))
 		{
 			OutResponse = TimeWindowError;
 			return true;
@@ -244,14 +237,7 @@ bool HandleMarksCommands(const FInsightCliRequest& Request, const FTraceContext&
 		{
 			Meta.Add(TEXT("filter_thread_id"), FString::FromInt(ThreadIdFilter));
 		}
-		if (TimeWindow.StartMs.IsSet())
-		{
-			Meta.Add(TEXT("filter_time_start"), ToNumberString(TimeWindow.StartMs.GetValue()));
-		}
-		if (TimeWindow.EndMs.IsSet())
-		{
-			Meta.Add(TEXT("filter_time_end"), ToNumberString(TimeWindow.EndMs.GetValue()));
-		}
+		AppendTimeWindowMeta(TimeWindow, Meta);
 		Meta.Add(TEXT("data_source"), TEXT("trace"));
 
 		OutResponse = FInsightCliResponse::Ok(MakeEnvelopeWithArray(Data, Meta));

@@ -10,15 +10,15 @@ bool HandleMemoryCommands(const FInsightCliRequest& Request, const FTraceContext
 	if (Request.Group == TEXT("memory") && Request.Action == TEXT("summary"))
 	{
 		FInsightCliResponse UnknownOptionError;
-		if (!ValidateNoUnknownOptionsWithGlobals(Request.Args, { TEXT("time-start"), TEXT("time-end") }, UnknownOptionError))
+		if (!ValidateNoUnknownOptionsWithGlobals(Request.Args, { TEXT("time-start"), TEXT("time-end"), TEXT("frame-range") }, UnknownOptionError))
 		{
 			OutResponse = UnknownOptionError;
 			return true;
 		}
 
-		FTimeWindowMs TimeWindow;
+		FResolvedTimeWindowMs TimeWindow;
 		FInsightCliResponse TimeWindowError;
-		if (!TryGetTimeWindowMs(Request.Args, TimeWindow, TimeWindowError))
+		if (!TryResolveTimeWindowMs(Context, Request.Args, true, TimeWindow, TimeWindowError))
 		{
 			OutResponse = TimeWindowError;
 			return true;
@@ -42,14 +42,7 @@ bool HandleMemoryCommands(const FInsightCliRequest& Request, const FTraceContext
 
 		TMap<FString, FString> Meta;
 		Meta.Add(TEXT("data_source"), TEXT("trace"));
-		if (TimeWindow.StartMs.IsSet())
-		{
-			Meta.Add(TEXT("time_start_ms"), ToNumberString(TimeWindow.StartMs.GetValue()));
-		}
-		if (TimeWindow.EndMs.IsSet())
-		{
-			Meta.Add(TEXT("time_end_ms"), ToNumberString(TimeWindow.EndMs.GetValue()));
-		}
+		AppendTimeWindowMeta(TimeWindow, Meta);
 		OutResponse = FInsightCliResponse::Ok(MakeEnvelopeWithObject(MakeMemorySummaryObject(Samples), Meta));
 		return true;
 	}
@@ -57,15 +50,15 @@ bool HandleMemoryCommands(const FInsightCliRequest& Request, const FTraceContext
 	if (Request.Group == TEXT("memory") && Request.Action == TEXT("peak"))
 	{
 		FInsightCliResponse UnknownOptionError;
-		if (!ValidateNoUnknownOptionsWithGlobals(Request.Args, { TEXT("time-start"), TEXT("time-end") }, UnknownOptionError))
+		if (!ValidateNoUnknownOptionsWithGlobals(Request.Args, { TEXT("time-start"), TEXT("time-end"), TEXT("frame-range") }, UnknownOptionError))
 		{
 			OutResponse = UnknownOptionError;
 			return true;
 		}
 
-		FTimeWindowMs TimeWindow;
+		FResolvedTimeWindowMs TimeWindow;
 		FInsightCliResponse TimeWindowError;
-		if (!TryGetTimeWindowMs(Request.Args, TimeWindow, TimeWindowError))
+		if (!TryResolveTimeWindowMs(Context, Request.Args, true, TimeWindow, TimeWindowError))
 		{
 			OutResponse = TimeWindowError;
 			return true;
@@ -89,14 +82,7 @@ bool HandleMemoryCommands(const FInsightCliRequest& Request, const FTraceContext
 
 		TMap<FString, FString> Meta;
 		Meta.Add(TEXT("data_source"), TEXT("trace"));
-		if (TimeWindow.StartMs.IsSet())
-		{
-			Meta.Add(TEXT("time_start_ms"), ToNumberString(TimeWindow.StartMs.GetValue()));
-		}
-		if (TimeWindow.EndMs.IsSet())
-		{
-			Meta.Add(TEXT("time_end_ms"), ToNumberString(TimeWindow.EndMs.GetValue()));
-		}
+		AppendTimeWindowMeta(TimeWindow, Meta);
 		OutResponse = FInsightCliResponse::Ok(MakeEnvelopeWithObject(MakeMemoryPeakObject(Samples), Meta));
 		return true;
 	}
@@ -104,7 +90,7 @@ bool HandleMemoryCommands(const FInsightCliRequest& Request, const FTraceContext
 	if (Request.Group == TEXT("memory") && Request.Action == TEXT("series"))
 	{
 		FInsightCliResponse UnknownOptionError;
-		if (!ValidateNoUnknownOptionsWithGlobals(Request.Args, { TEXT("limit"), TEXT("time-start"), TEXT("time-end") }, UnknownOptionError))
+		if (!ValidateNoUnknownOptionsWithGlobals(Request.Args, { TEXT("limit"), TEXT("time-start"), TEXT("time-end"), TEXT("frame-range") }, UnknownOptionError))
 		{
 			OutResponse = UnknownOptionError;
 			return true;
@@ -118,9 +104,9 @@ bool HandleMemoryCommands(const FInsightCliRequest& Request, const FTraceContext
 			return true;
 		}
 
-		FTimeWindowMs TimeWindow;
+		FResolvedTimeWindowMs TimeWindow;
 		FInsightCliResponse TimeWindowError;
-		if (!TryGetTimeWindowMs(Request.Args, TimeWindow, TimeWindowError))
+		if (!TryResolveTimeWindowMs(Context, Request.Args, true, TimeWindow, TimeWindowError))
 		{
 			OutResponse = TimeWindowError;
 			return true;
@@ -158,14 +144,7 @@ bool HandleMemoryCommands(const FInsightCliRequest& Request, const FTraceContext
 		TMap<FString, FString> Meta;
 		Meta.Add(TEXT("data_source"), TEXT("trace"));
 		Meta.Add(TEXT("limit"), FString::FromInt(Limit));
-		if (TimeWindow.StartMs.IsSet())
-		{
-			Meta.Add(TEXT("time_start_ms"), ToNumberString(TimeWindow.StartMs.GetValue()));
-		}
-		if (TimeWindow.EndMs.IsSet())
-		{
-			Meta.Add(TEXT("time_end_ms"), ToNumberString(TimeWindow.EndMs.GetValue()));
-		}
+		AppendTimeWindowMeta(TimeWindow, Meta);
 		OutResponse = FInsightCliResponse::Ok(MakeEnvelopeWithArray(Data, Meta));
 		return true;
 	}
@@ -173,7 +152,7 @@ bool HandleMemoryCommands(const FInsightCliRequest& Request, const FTraceContext
 	if (Request.Group == TEXT("memory") && Request.Action == TEXT("tags"))
 	{
 		FInsightCliResponse UnknownOptionError;
-		if (!ValidateNoUnknownOptionsWithGlobals(Request.Args, { TEXT("limit"), TEXT("time-start"), TEXT("time-end") }, UnknownOptionError))
+		if (!ValidateNoUnknownOptionsWithGlobals(Request.Args, { TEXT("limit"), TEXT("time-start"), TEXT("time-end"), TEXT("frame-range") }, UnknownOptionError))
 		{
 			OutResponse = UnknownOptionError;
 			return true;
@@ -187,9 +166,9 @@ bool HandleMemoryCommands(const FInsightCliRequest& Request, const FTraceContext
 			return true;
 		}
 
-		FTimeWindowMs TimeWindow;
+		FResolvedTimeWindowMs TimeWindow;
 		FInsightCliResponse TimeWindowError;
-		if (!TryGetTimeWindowMs(Request.Args, TimeWindow, TimeWindowError))
+		if (!TryResolveTimeWindowMs(Context, Request.Args, true, TimeWindow, TimeWindowError))
 		{
 			OutResponse = TimeWindowError;
 			return true;
@@ -222,14 +201,7 @@ bool HandleMemoryCommands(const FInsightCliRequest& Request, const FTraceContext
 		TMap<FString, FString> Meta;
 		Meta.Add(TEXT("data_source"), TEXT("trace"));
 		Meta.Add(TEXT("limit"), FString::FromInt(Limit));
-		if (TimeWindow.StartMs.IsSet())
-		{
-			Meta.Add(TEXT("time_start_ms"), ToNumberString(TimeWindow.StartMs.GetValue()));
-		}
-		if (TimeWindow.EndMs.IsSet())
-		{
-			Meta.Add(TEXT("time_end_ms"), ToNumberString(TimeWindow.EndMs.GetValue()));
-		}
+		AppendTimeWindowMeta(TimeWindow, Meta);
 		OutResponse = FInsightCliResponse::Ok(MakeEnvelopeWithArray(Data, Meta));
 		return true;
 	}
