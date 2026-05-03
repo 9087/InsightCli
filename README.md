@@ -5,7 +5,7 @@ It reads `.utrace` / `.trace` inputs and returns machine-friendly JSON output fo
 
 ## What It Can Do
 
-- Session and trace metadata: `info summary`
+- Session and trace metadata: `info summary`, `info channels`
 - Frame analysis: `frames summary`, `frames slowest`, `frames detail`
 - CPU and GPU hotspots: `cpu top`, `cpu stack`, `gpu top`, `gpu pass-detail`
 - Threads and tasks: `threads waits`, `tasks top`
@@ -52,6 +52,9 @@ InsightCli.exe <trace_path> counters list
 
 # Search marks by keyword
 InsightCli.exe <trace_path> marks search --keyword load
+
+# List enabled/known trace channels
+InsightCli.exe <trace_path> info channels
 ```
 
 ## Output Contract

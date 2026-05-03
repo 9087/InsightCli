@@ -4,6 +4,7 @@
 
 #include "Misc/Paths.h"
 #include "TraceServices/Model/AnalysisSession.h"
+#include "TraceServices/Model/Channel.h"
 #include "TraceServices/Model/Threads.h"
 
 namespace UE::InsightCli::Internal
@@ -109,6 +110,67 @@ TSharedRef<FJsonObject> MakeInfoSummaryData(const FTraceContext& Context)
 	Data->SetStringField(TEXT("platform"), FPlatformProperties::IniPlatformName());
 	Data->SetStringField(TEXT("build_version"), TEXT("unavailable"));
 	Data->SetStringField(TEXT("build_version_reason"), TEXT("trace_build_version_not_exposed"));
+	return Data;
+}
+
+TSharedRef<FJsonObject> MakeInfoChannelsData(const FTraceContext& Context, TMap<FString, FString>& OutMeta)
+{
+	const TSharedRef<FJsonObject> Data = MakeShared<FJsonObject>();
+	TArray<TSharedPtr<FJsonValue>> ChannelsArray;
+
+	OutMeta.Add(TEXT("data_source"), TEXT("unavailable"));
+	OutMeta.Add(TEXT("channel_count"), TEXT("0"));
+
+	TSharedPtr<const TraceServices::IAnalysisSession> Session;
+	FString FailureStage;
+	FString FailureReason;
+	if (!AcquireAnalysisSession(Context, Session, FailureStage, FailureReason))
+	{
+		OutMeta.Add(TEXT("channel_provider_reason"), FString::Printf(TEXT("analysis_session_unavailable:%s:%s"), *FailureStage, *FailureReason));
+		Data->SetArrayField(TEXT("channels"), ChannelsArray);
+		return Data;
+	}
+
+	bool bHasChannelProvider = false;
+	FDateTime ChannelTimeStamp;
+	{
+		TraceServices::FAnalysisSessionReadScope SessionReadScope(*Session.Get());
+		const TraceServices::IChannelProvider* ChannelProvider = TraceServices::ReadChannelProvider(*Session.Get());
+		if (ChannelProvider != nullptr)
+		{
+			bHasChannelProvider = true;
+			ChannelTimeStamp = ChannelProvider->GetTimeStamp();
+
+			const TArray<TraceServices::FChannelEntry>& Channels = ChannelProvider->GetChannels();
+			ChannelsArray.Reserve(Channels.Num());
+			for (const TraceServices::FChannelEntry& Channel : Channels)
+			{
+				const TSharedRef<FJsonObject> Item = MakeShared<FJsonObject>();
+				Item->SetNumberField(TEXT("channel_id"), Channel.Id);
+				Item->SetStringField(TEXT("name"), Channel.Name);
+				Item->SetBoolField(TEXT("enabled"), Channel.bIsEnabled);
+				Item->SetBoolField(TEXT("read_only"), Channel.bReadOnly);
+				Item->SetStringField(TEXT("provider"), TEXT("ChannelProvider"));
+				Item->SetStringField(TEXT("event_count"), TEXT("unavailable"));
+				Item->SetStringField(TEXT("event_count_reason"), TEXT("channel_event_count_not_exposed"));
+				Item->SetStringField(TEXT("first_ts"), TEXT("unavailable"));
+				Item->SetStringField(TEXT("last_ts"), TEXT("unavailable"));
+				ChannelsArray.Add(MakeShared<FJsonValueObject>(Item));
+			}
+		}
+	}
+
+	if (!bHasChannelProvider)
+	{
+		OutMeta.Add(TEXT("channel_provider_reason"), TEXT("channel_provider_not_available"));
+		Data->SetArrayField(TEXT("channels"), ChannelsArray);
+		return Data;
+	}
+
+	OutMeta.Add(TEXT("data_source"), TEXT("trace"));
+	OutMeta.Add(TEXT("channel_count"), FString::FromInt(ChannelsArray.Num()));
+	OutMeta.Add(TEXT("channel_timestamp"), ChannelTimeStamp.ToIso8601());
+	Data->SetArrayField(TEXT("channels"), ChannelsArray);
 	return Data;
 }
 

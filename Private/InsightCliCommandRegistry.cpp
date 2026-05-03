@@ -21,6 +21,7 @@ struct FCommandCatalogEntry
 constexpr FCommandCatalogEntry CommandCatalog[] =
 {
 	{ TEXT("info"), TEXT("summary"), &HandleInfoAndFramesCommands },
+	{ TEXT("info"), TEXT("channels"), &HandleInfoAndFramesCommands },
 	{ TEXT("frames"), TEXT("summary"), &HandleInfoAndFramesCommands },
 	{ TEXT("frames"), TEXT("slowest"), &HandleInfoAndFramesCommands },
 	{ TEXT("frames"), TEXT("detail"), &HandleInfoAndFramesCommands },

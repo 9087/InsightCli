@@ -19,6 +19,20 @@ bool HandleInfoAndFramesCommands(const FInsightCliRequest& Request, const FTrace
 		return true;
 	}
 
+	if (Request.Group == TEXT("info") && Request.Action == TEXT("channels"))
+	{
+		FInsightCliResponse UnknownOptionError;
+		if (!ValidateNoUnknownOptionsWithGlobals(Request.Args, {}, UnknownOptionError))
+		{
+			OutResponse = UnknownOptionError;
+			return true;
+		}
+
+		TMap<FString, FString> Meta;
+		OutResponse = FInsightCliResponse::Ok(MakeEnvelopeWithObject(MakeInfoChannelsData(Context, Meta), Meta));
+		return true;
+	}
+
 	if (Request.Group == TEXT("frames") && Request.Action == TEXT("summary"))
 	{
 		FInsightCliResponse UnknownOptionError;

@@ -210,6 +210,7 @@ void ApplyTimeWindowFilter(TArray<FFrameSample>& Frames, const TArray<FString>& 
 
 // JSON builders: info + frames
 TSharedRef<FJsonObject> MakeInfoSummaryData(const FTraceContext& Context);
+TSharedRef<FJsonObject> MakeInfoChannelsData(const FTraceContext& Context, TMap<FString, FString>& OutMeta);
 TSharedRef<FJsonObject> MakeFramesSummaryData(const TArray<FFrameSample>& Frames);
 TSharedRef<FJsonObject> MakeFrameObject(const FFrameSample& Sample);
 

@@ -220,6 +220,22 @@ function Invoke-NormalTraceSmoke {
                 throw 'Expected end_timestamp to be unavailable when duration_ms == 0'
             }
         }),
+        (New-SmokeCase -Message "[$([IO.Path]::GetFileName($TracePath))] Verify info channels returns channel catalog..." -Context 'info channels' -Args @($TracePath, 'info', 'channels') -MustContain @('"data"', '"channels"') -Validate {
+            param($result)
+            $json = Parse-JsonOutput -Text $result.Text -Context 'info channels'
+            if ($null -eq $json.data -or $null -eq $json.data.channels) {
+                throw 'Expected info channels response to include data.channels array'
+            }
+            if ($null -eq $json.meta -or $null -eq $json.meta.channel_count) {
+                throw 'Expected info channels response to include meta.channel_count'
+            }
+
+            foreach ($channel in $json.data.channels) {
+                if ([string]::IsNullOrWhiteSpace([string]$channel.name)) {
+                    throw 'Expected each info channels row to include non-empty name'
+                }
+            }
+        }),
         (New-SmokeCase -Message "[$([IO.Path]::GetFileName($TracePath))] Verify frames summary returns timeline metrics..." -Context 'frames summary' -Args @($TracePath, 'frames', 'summary') -MustContain @('"data"', '"frame_count"')),
         (New-SmokeCase -Message "[$([IO.Path]::GetFileName($TracePath))] Verify frames slowest returns frame list..." -Context 'frames slowest' -Args @($TracePath, 'frames', 'slowest', '--limit', '3') -MustContain @('"data"', '"frame_index"'))
     )
