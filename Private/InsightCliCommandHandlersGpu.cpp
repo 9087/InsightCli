@@ -29,13 +29,14 @@ bool HandleGpuCommands(const FInsightCliRequest& Request, const FTraceContext& C
 		FString FailureReason;
 		if (!BuildGpuTopSamples(Context, Samples, FailureStage, FailureReason))
 		{
-			TMap<FString, FString> Details;
-			Details.Add(TEXT("trace_path"), Context.FullPath);
-			Details.Add(TEXT("consumer"), TEXT("gpu.top"));
-			Details.Add(TEXT("failure_stage"), FailureStage.IsEmpty() ? TEXT("aggregation") : FailureStage);
-			Details.Add(TEXT("failure_reason"), FailureReason.IsEmpty() ? TEXT("failed to build gpu aggregation") : FailureReason);
-			Details.Add(TEXT("data_source"), TEXT("unavailable"));
-			OutResponse = FInsightCliResponse::Error(10, TEXT("E3001"), TEXT("Trace-backed GPU timing is unavailable for this trace."), Details);
+			OutResponse = MakeTraceUnavailableError(
+				Context,
+				TEXT("gpu.top"),
+				FailureStage,
+				FailureReason,
+				TEXT("aggregation"),
+				TEXT("failed to build gpu aggregation"),
+				TEXT("Trace-backed GPU timing is unavailable for this trace."));
 			return true;
 		}
 
@@ -123,14 +124,15 @@ bool HandleGpuCommands(const FInsightCliRequest& Request, const FTraceContext& C
 			Found->FrameStartMs / 1000.0,
 			Found->FrameEndMs / 1000.0))
 		{
-			TMap<FString, FString> Details;
-			Details.Add(TEXT("trace_path"), Context.FullPath);
-			Details.Add(TEXT("consumer"), TEXT("gpu.pass-detail"));
-			Details.Add(TEXT("frame_index"), FString::FromInt(FrameIndex));
-			Details.Add(TEXT("failure_stage"), FailureStage.IsEmpty() ? TEXT("aggregation") : FailureStage);
-			Details.Add(TEXT("failure_reason"), FailureReason.IsEmpty() ? TEXT("failed to build frame gpu aggregation") : FailureReason);
-			Details.Add(TEXT("data_source"), TEXT("unavailable"));
-			OutResponse = FInsightCliResponse::Error(10, TEXT("E3001"), TEXT("Trace-backed GPU timing is unavailable for this trace."), Details);
+			OutResponse = MakeTraceUnavailableError(
+				Context,
+				TEXT("gpu.pass-detail"),
+				FailureStage,
+				FailureReason,
+				TEXT("aggregation"),
+				TEXT("failed to build frame gpu aggregation"),
+				TEXT("Trace-backed GPU timing is unavailable for this trace."),
+				{{TEXT("frame_index"), FString::FromInt(FrameIndex)}});
 			return true;
 		}
 

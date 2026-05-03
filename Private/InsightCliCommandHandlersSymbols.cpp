@@ -29,13 +29,14 @@ bool HandleSymbolsCommands(const FInsightCliRequest& Request, const FTraceContex
 		FString FailureReason;
 		if (!BuildSymbolsResolveObject(Context, ScopeName, DataObject, bFound, FailureStage, FailureReason))
 		{
-			TMap<FString, FString> Details;
-			Details.Add(TEXT("trace_path"), Context.FullPath);
-			Details.Add(TEXT("consumer"), TEXT("symbols.resolve"));
-			Details.Add(TEXT("failure_stage"), FailureStage.IsEmpty() ? TEXT("symbol_lookup") : FailureStage);
-			Details.Add(TEXT("failure_reason"), FailureReason.IsEmpty() ? TEXT("failed to resolve symbols from trace") : FailureReason);
-			Details.Add(TEXT("data_source"), TEXT("unavailable"));
-			OutResponse = FInsightCliResponse::Error(10, TEXT("E3001"), TEXT("Trace-backed symbol resolution is unavailable for this trace."), Details);
+			OutResponse = MakeTraceUnavailableError(
+				Context,
+				TEXT("symbols.resolve"),
+				FailureStage,
+				FailureReason,
+				TEXT("symbol_lookup"),
+				TEXT("failed to resolve symbols from trace"),
+				TEXT("Trace-backed symbol resolution is unavailable for this trace."));
 			return true;
 		}
 

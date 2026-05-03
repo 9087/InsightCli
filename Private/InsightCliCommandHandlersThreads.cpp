@@ -32,17 +32,20 @@ bool HandleThreadsCommands(const FInsightCliRequest& Request, const FTraceContex
 		bool bFrameFound = true;
 		if (!BuildThreadWaitSamplesTrace(Context, bHasFrameIndex ? TOptional<int32>(FrameIndexFilter) : TOptional<int32>(), Waits, FailureStage, FailureReason, bFrameFound))
 		{
-			TMap<FString, FString> Details;
-			Details.Add(TEXT("trace_path"), Context.FullPath);
-			Details.Add(TEXT("consumer"), TEXT("threads.waits"));
-			Details.Add(TEXT("failure_stage"), FailureStage.IsEmpty() ? TEXT("waits_extraction") : FailureStage);
-			Details.Add(TEXT("failure_reason"), FailureReason.IsEmpty() ? TEXT("failed to build thread waits") : FailureReason);
+			TMap<FString, FString> ExtraDetails;
 			if (bHasFrameIndex)
 			{
-				Details.Add(TEXT("frame_index"), FString::FromInt(FrameIndexFilter));
+				ExtraDetails.Add(TEXT("frame_index"), FString::FromInt(FrameIndexFilter));
 			}
-			Details.Add(TEXT("data_source"), TEXT("unavailable"));
-			OutResponse = FInsightCliResponse::Error(10, TEXT("E3001"), TEXT("Trace-backed thread wait causality is unavailable for this trace."), Details);
+			OutResponse = MakeTraceUnavailableError(
+				Context,
+				TEXT("threads.waits"),
+				FailureStage,
+				FailureReason,
+				TEXT("waits_extraction"),
+				TEXT("failed to build thread waits"),
+				TEXT("Trace-backed thread wait causality is unavailable for this trace."),
+				ExtraDetails);
 			return true;
 		}
 

@@ -446,6 +446,31 @@ TMap<FString, FString> MakeNotFoundMeta(const FInsightCliRequest& Request, const
 	return Meta;
 }
 
+FInsightCliResponse MakeTraceUnavailableError(
+	const FTraceContext& Context,
+	const TCHAR* Consumer,
+	const FString& FailureStage,
+	const FString& FailureReason,
+	const TCHAR* DefaultStage,
+	const TCHAR* DefaultReason,
+	const TCHAR* Message,
+	const TMap<FString, FString>& ExtraDetails)
+{
+	TMap<FString, FString> Details;
+	Details.Add(TEXT("trace_path"), Context.FullPath);
+	Details.Add(TEXT("consumer"), Consumer);
+	Details.Add(TEXT("failure_stage"), FailureStage.IsEmpty() ? DefaultStage : FailureStage);
+	Details.Add(TEXT("failure_reason"), FailureReason.IsEmpty() ? DefaultReason : FailureReason);
+	Details.Add(TEXT("data_source"), TEXT("unavailable"));
+
+	for (const TPair<FString, FString>& Detail : ExtraDetails)
+	{
+		Details.Add(Detail.Key, Detail.Value);
+	}
+
+	return FInsightCliResponse::Error(10, TEXT("E3001"), Message, Details);
+}
+
 FInsightCliResponse ValidateTraceAndBuildContext(const FInsightCliRequest& Request, FTraceContext& OutContext)
 {
 	if (Request.TracePath.IsEmpty())
@@ -705,14 +730,14 @@ bool EnsureTraceBackedFrameSamples(const FTraceContext& Context, FInsightCliResp
 		return true;
 	}
 
-	TMap<FString, FString> Details;
-	Details.Add(TEXT("trace_path"), Context.FullPath);
-	Details.Add(TEXT("consumer"), ConsumerTag);
-	Details.Add(TEXT("failure_stage"), Context.FrameSamplesFailureStage.IsEmpty() ? TEXT("unknown") : Context.FrameSamplesFailureStage);
-	Details.Add(TEXT("failure_reason"), Context.FrameSamplesFailureReason.IsEmpty() ? TEXT("unknown") : Context.FrameSamplesFailureReason);
-	Details.Add(TEXT("data_source"), TEXT("unavailable"));
-
-	OutError = FInsightCliResponse::Error(10, TEXT("E3001"), TEXT("Trace-backed frame timeline is unavailable for this trace."), Details);
+	OutError = MakeTraceUnavailableError(
+		Context,
+		*ConsumerTag,
+		Context.FrameSamplesFailureStage,
+		Context.FrameSamplesFailureReason,
+		TEXT("unknown"),
+		TEXT("unknown"),
+		TEXT("Trace-backed frame timeline is unavailable for this trace."));
 	return false;
 }
 

@@ -31,13 +31,14 @@ bool HandleMemoryCommands(const FInsightCliRequest& Request, const FTraceContext
 		FString FailureReason;
 		if (!BuildMemorySamplesTrace(Context, Samples, FailureStage, FailureReason, bHasStart ? TOptional<double>(Start) : TOptional<double>(), bHasEnd ? TOptional<double>(End) : TOptional<double>()))
 		{
-			TMap<FString, FString> Details;
-			Details.Add(TEXT("trace_path"), Context.FullPath);
-			Details.Add(TEXT("consumer"), TEXT("memory.summary"));
-			Details.Add(TEXT("failure_stage"), FailureStage.IsEmpty() ? TEXT("memory_extraction") : FailureStage);
-			Details.Add(TEXT("failure_reason"), FailureReason.IsEmpty() ? TEXT("failed to build memory summary") : FailureReason);
-			Details.Add(TEXT("data_source"), TEXT("unavailable"));
-			OutResponse = FInsightCliResponse::Error(10, TEXT("E3001"), TEXT("Trace-backed memory metrics are unavailable for this trace."), Details);
+			OutResponse = MakeTraceUnavailableError(
+				Context,
+				TEXT("memory.summary"),
+				FailureStage,
+				FailureReason,
+				TEXT("memory_extraction"),
+				TEXT("failed to build memory summary"),
+				TEXT("Trace-backed memory metrics are unavailable for this trace."));
 			return true;
 		}
 
@@ -79,13 +80,14 @@ bool HandleMemoryCommands(const FInsightCliRequest& Request, const FTraceContext
 		FString FailureReason;
 		if (!BuildMemorySamplesTrace(Context, Samples, FailureStage, FailureReason, bHasStart ? TOptional<double>(Start) : TOptional<double>(), bHasEnd ? TOptional<double>(End) : TOptional<double>()))
 		{
-			TMap<FString, FString> Details;
-			Details.Add(TEXT("trace_path"), Context.FullPath);
-			Details.Add(TEXT("consumer"), TEXT("memory.peak"));
-			Details.Add(TEXT("failure_stage"), FailureStage.IsEmpty() ? TEXT("memory_extraction") : FailureStage);
-			Details.Add(TEXT("failure_reason"), FailureReason.IsEmpty() ? TEXT("failed to build memory peak") : FailureReason);
-			Details.Add(TEXT("data_source"), TEXT("unavailable"));
-			OutResponse = FInsightCliResponse::Error(10, TEXT("E3001"), TEXT("Trace-backed memory metrics are unavailable for this trace."), Details);
+			OutResponse = MakeTraceUnavailableError(
+				Context,
+				TEXT("memory.peak"),
+				FailureStage,
+				FailureReason,
+				TEXT("memory_extraction"),
+				TEXT("failed to build memory peak"),
+				TEXT("Trace-backed memory metrics are unavailable for this trace."));
 			return true;
 		}
 
@@ -135,13 +137,14 @@ bool HandleMemoryCommands(const FInsightCliRequest& Request, const FTraceContext
 		FString FailureReason;
 		if (!BuildMemorySamplesTrace(Context, Samples, FailureStage, FailureReason, bHasStart ? TOptional<double>(Start) : TOptional<double>(), bHasEnd ? TOptional<double>(End) : TOptional<double>()))
 		{
-			TMap<FString, FString> Details;
-			Details.Add(TEXT("trace_path"), Context.FullPath);
-			Details.Add(TEXT("consumer"), TEXT("memory.series"));
-			Details.Add(TEXT("failure_stage"), FailureStage.IsEmpty() ? TEXT("memory_extraction") : FailureStage);
-			Details.Add(TEXT("failure_reason"), FailureReason.IsEmpty() ? TEXT("failed to build memory series") : FailureReason);
-			Details.Add(TEXT("data_source"), TEXT("unavailable"));
-			OutResponse = FInsightCliResponse::Error(10, TEXT("E3001"), TEXT("Trace-backed memory metrics are unavailable for this trace."), Details);
+			OutResponse = MakeTraceUnavailableError(
+				Context,
+				TEXT("memory.series"),
+				FailureStage,
+				FailureReason,
+				TEXT("memory_extraction"),
+				TEXT("failed to build memory series"),
+				TEXT("Trace-backed memory metrics are unavailable for this trace."));
 			return true;
 		}
 
@@ -205,13 +208,14 @@ bool HandleMemoryCommands(const FInsightCliRequest& Request, const FTraceContext
 		FString FailureReason;
 		if (!BuildMemoryTagsTrace(Context, Tags, FailureStage, FailureReason, bHasStart ? TOptional<double>(Start) : TOptional<double>(), bHasEnd ? TOptional<double>(End) : TOptional<double>()))
 		{
-			TMap<FString, FString> Details;
-			Details.Add(TEXT("trace_path"), Context.FullPath);
-			Details.Add(TEXT("consumer"), TEXT("memory.tags"));
-			Details.Add(TEXT("failure_stage"), FailureStage.IsEmpty() ? TEXT("memory_tags") : FailureStage);
-			Details.Add(TEXT("failure_reason"), FailureReason.IsEmpty() ? TEXT("failed to build memory tags") : FailureReason);
-			Details.Add(TEXT("data_source"), TEXT("unavailable"));
-			OutResponse = FInsightCliResponse::Error(10, TEXT("E3001"), TEXT("Trace-backed memory metrics are unavailable for this trace."), Details);
+			OutResponse = MakeTraceUnavailableError(
+				Context,
+				TEXT("memory.tags"),
+				FailureStage,
+				FailureReason,
+				TEXT("memory_tags"),
+				TEXT("failed to build memory tags"),
+				TEXT("Trace-backed memory metrics are unavailable for this trace."));
 			return true;
 		}
 

@@ -32,17 +32,20 @@ bool HandleTasksCommands(const FInsightCliRequest& Request, const FTraceContext&
 		bool bFrameFound = true;
 		if (!BuildTaskTopSamples(Context, bHasFrameIndex ? TOptional<int32>(FrameIndexFilter) : TOptional<int32>(), Tasks, FailureStage, FailureReason, bFrameFound))
 		{
-			TMap<FString, FString> Details;
-			Details.Add(TEXT("trace_path"), Context.FullPath);
-			Details.Add(TEXT("consumer"), TEXT("tasks.top"));
-			Details.Add(TEXT("failure_stage"), FailureStage.IsEmpty() ? TEXT("tasks_extraction") : FailureStage);
-			Details.Add(TEXT("failure_reason"), FailureReason.IsEmpty() ? TEXT("failed to build task diagnostics") : FailureReason);
+			TMap<FString, FString> ExtraDetails;
 			if (bHasFrameIndex)
 			{
-				Details.Add(TEXT("frame_index"), FString::FromInt(FrameIndexFilter));
+				ExtraDetails.Add(TEXT("frame_index"), FString::FromInt(FrameIndexFilter));
 			}
-			Details.Add(TEXT("data_source"), TEXT("unavailable"));
-			OutResponse = FInsightCliResponse::Error(10, TEXT("E3001"), TEXT("Trace-backed task graph diagnostics are unavailable for this trace."), Details);
+			OutResponse = MakeTraceUnavailableError(
+				Context,
+				TEXT("tasks.top"),
+				FailureStage,
+				FailureReason,
+				TEXT("tasks_extraction"),
+				TEXT("failed to build task diagnostics"),
+				TEXT("Trace-backed task graph diagnostics are unavailable for this trace."),
+				ExtraDetails);
 			return true;
 		}
 

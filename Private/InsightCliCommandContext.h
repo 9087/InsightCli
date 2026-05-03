@@ -165,6 +165,15 @@ TMap<FString, FString> MakeNotFoundMeta(const FInsightCliRequest& Request, const
 
 // Trace/context bootstrap and shared frame data
 FInsightCliResponse ValidateTraceAndBuildContext(const FInsightCliRequest& Request, FTraceContext& OutContext);
+FInsightCliResponse MakeTraceUnavailableError(
+	const FTraceContext& Context,
+	const TCHAR* Consumer,
+	const FString& FailureStage,
+	const FString& FailureReason,
+	const TCHAR* DefaultStage,
+	const TCHAR* DefaultReason,
+	const TCHAR* Message,
+	const TMap<FString, FString>& ExtraDetails = {});
 bool AcquireAnalysisSession(
 	const FTraceContext& Context,
 	TSharedPtr<const TraceServices::IAnalysisSession>& OutSession,

@@ -49,14 +49,15 @@ bool HandleCpuCommands(const FInsightCliRequest& Request, const FTraceContext& C
 			FString FailureReason;
 			if (!ResolveCpuThreadFilterToTraceId(Context, ThreadFilter, ResolvedThreadId, NormalizedThread, FailureStage, FailureReason))
 			{
-				TMap<FString, FString> Details;
-				Details.Add(TEXT("trace_path"), Context.FullPath);
-				Details.Add(TEXT("consumer"), TEXT("cpu.top"));
-				Details.Add(TEXT("thread_filter"), ThreadFilter);
-				Details.Add(TEXT("failure_stage"), FailureStage.IsEmpty() ? TEXT("thread_filter") : FailureStage);
-				Details.Add(TEXT("failure_reason"), FailureReason.IsEmpty() ? TEXT("failed to resolve cpu thread filter") : FailureReason);
-				Details.Add(TEXT("data_source"), TEXT("unavailable"));
-				OutResponse = FInsightCliResponse::Error(10, TEXT("E3001"), TEXT("Trace-backed CPU timing is unavailable for this trace."), Details);
+				OutResponse = MakeTraceUnavailableError(
+					Context,
+					TEXT("cpu.top"),
+					FailureStage,
+					FailureReason,
+					TEXT("thread_filter"),
+					TEXT("failed to resolve cpu thread filter"),
+					TEXT("Trace-backed CPU timing is unavailable for this trace."),
+					{{TEXT("thread_filter"), ThreadFilter}});
 				return true;
 			}
 
@@ -68,13 +69,14 @@ bool HandleCpuCommands(const FInsightCliRequest& Request, const FTraceContext& C
 		FString FailureReason;
 		if (!BuildCpuTopSamples(Context, CpuThreadId, Samples, FailureStage, FailureReason))
 		{
-			TMap<FString, FString> Details;
-			Details.Add(TEXT("trace_path"), Context.FullPath);
-			Details.Add(TEXT("consumer"), TEXT("cpu.top"));
-			Details.Add(TEXT("failure_stage"), FailureStage.IsEmpty() ? TEXT("aggregation") : FailureStage);
-			Details.Add(TEXT("failure_reason"), FailureReason.IsEmpty() ? TEXT("failed to build cpu aggregation") : FailureReason);
-			Details.Add(TEXT("data_source"), TEXT("unavailable"));
-			OutResponse = FInsightCliResponse::Error(10, TEXT("E3001"), TEXT("Trace-backed CPU timing is unavailable for this trace."), Details);
+			OutResponse = MakeTraceUnavailableError(
+				Context,
+				TEXT("cpu.top"),
+				FailureStage,
+				FailureReason,
+				TEXT("aggregation"),
+				TEXT("failed to build cpu aggregation"),
+				TEXT("Trace-backed CPU timing is unavailable for this trace."));
 			return true;
 		}
 
@@ -137,14 +139,15 @@ bool HandleCpuCommands(const FInsightCliRequest& Request, const FTraceContext& C
 			FString ThreadFailureReason;
 			if (!ResolveCpuThreadFilterToTraceId(Context, ThreadFilter, ResolvedThreadId, NormalizedThread, ThreadFailureStage, ThreadFailureReason))
 			{
-				TMap<FString, FString> Details;
-				Details.Add(TEXT("trace_path"), Context.FullPath);
-				Details.Add(TEXT("consumer"), TEXT("cpu.stack"));
-				Details.Add(TEXT("thread_filter"), ThreadFilter);
-				Details.Add(TEXT("failure_stage"), ThreadFailureStage.IsEmpty() ? TEXT("thread_filter") : ThreadFailureStage);
-				Details.Add(TEXT("failure_reason"), ThreadFailureReason.IsEmpty() ? TEXT("failed to resolve cpu thread filter") : ThreadFailureReason);
-				Details.Add(TEXT("data_source"), TEXT("unavailable"));
-				OutResponse = FInsightCliResponse::Error(10, TEXT("E3001"), TEXT("Trace-backed CPU stack is unavailable for this trace."), Details);
+				OutResponse = MakeTraceUnavailableError(
+					Context,
+					TEXT("cpu.stack"),
+					ThreadFailureStage,
+					ThreadFailureReason,
+					TEXT("thread_filter"),
+					TEXT("failed to resolve cpu thread filter"),
+					TEXT("Trace-backed CPU stack is unavailable for this trace."),
+					{{TEXT("thread_filter"), ThreadFilter}});
 				return true;
 			}
 
@@ -157,18 +160,21 @@ bool HandleCpuCommands(const FInsightCliRequest& Request, const FTraceContext& C
 		FString FailureReason;
 		if (!BuildCpuStackObject(Context, FrameIndex, CpuThreadId, Limit, StackObject, bFound, FailureStage, FailureReason))
 		{
-			TMap<FString, FString> Details;
-			Details.Add(TEXT("trace_path"), Context.FullPath);
-			Details.Add(TEXT("consumer"), TEXT("cpu.stack"));
-			Details.Add(TEXT("frame_index"), FString::FromInt(FrameIndex));
+			TMap<FString, FString> ExtraDetails;
+			ExtraDetails.Add(TEXT("frame_index"), FString::FromInt(FrameIndex));
 			if (bHasThreadFilter)
 			{
-				Details.Add(TEXT("thread_filter"), ThreadFilter);
+				ExtraDetails.Add(TEXT("thread_filter"), ThreadFilter);
 			}
-			Details.Add(TEXT("failure_stage"), FailureStage.IsEmpty() ? TEXT("stack_extraction") : FailureStage);
-			Details.Add(TEXT("failure_reason"), FailureReason.IsEmpty() ? TEXT("failed to build cpu stack") : FailureReason);
-			Details.Add(TEXT("data_source"), TEXT("unavailable"));
-			OutResponse = FInsightCliResponse::Error(10, TEXT("E3001"), TEXT("Trace-backed CPU stack is unavailable for this trace."), Details);
+			OutResponse = MakeTraceUnavailableError(
+				Context,
+				TEXT("cpu.stack"),
+				FailureStage,
+				FailureReason,
+				TEXT("stack_extraction"),
+				TEXT("failed to build cpu stack"),
+				TEXT("Trace-backed CPU stack is unavailable for this trace."),
+				ExtraDetails);
 			return true;
 		}
 

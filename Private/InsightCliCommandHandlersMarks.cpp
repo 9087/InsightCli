@@ -64,13 +64,14 @@ bool HandleMarksCommands(const FInsightCliRequest& Request, const FTraceContext&
 			bHasTimeStart ? TOptional<double>(TimeStartMs) : TOptional<double>(),
 			bHasTimeEnd ? TOptional<double>(TimeEndMs) : TOptional<double>()))
 		{
-			TMap<FString, FString> Details;
-			Details.Add(TEXT("trace_path"), Context.FullPath);
-			Details.Add(TEXT("consumer"), TEXT("marks.search"));
-			Details.Add(TEXT("failure_stage"), FailureStage.IsEmpty() ? TEXT("marks_stream") : FailureStage);
-			Details.Add(TEXT("failure_reason"), FailureReason.IsEmpty() ? TEXT("failed to build marks stream") : FailureReason);
-			Details.Add(TEXT("data_source"), TEXT("unavailable"));
-			OutResponse = FInsightCliResponse::Error(10, TEXT("E3001"), TEXT("Trace-backed marks are unavailable for this trace."), Details);
+			OutResponse = MakeTraceUnavailableError(
+				Context,
+				TEXT("marks.search"),
+				FailureStage,
+				FailureReason,
+				TEXT("marks_stream"),
+				TEXT("failed to build marks stream"),
+				TEXT("Trace-backed marks are unavailable for this trace."));
 			return true;
 		}
 
@@ -220,13 +221,14 @@ bool HandleMarksCommands(const FInsightCliRequest& Request, const FTraceContext&
 			RequestStart,
 			RequestEnd))
 		{
-			TMap<FString, FString> Details;
-			Details.Add(TEXT("trace_path"), Context.FullPath);
-			Details.Add(TEXT("consumer"), TEXT("marks.around"));
-			Details.Add(TEXT("failure_stage"), FailureStage.IsEmpty() ? TEXT("marks_stream") : FailureStage);
-			Details.Add(TEXT("failure_reason"), FailureReason.IsEmpty() ? TEXT("failed to build marks stream") : FailureReason);
-			Details.Add(TEXT("data_source"), TEXT("unavailable"));
-			OutResponse = FInsightCliResponse::Error(10, TEXT("E3001"), TEXT("Trace-backed marks are unavailable for this trace."), Details);
+			OutResponse = MakeTraceUnavailableError(
+				Context,
+				TEXT("marks.around"),
+				FailureStage,
+				FailureReason,
+				TEXT("marks_stream"),
+				TEXT("failed to build marks stream"),
+				TEXT("Trace-backed marks are unavailable for this trace."));
 			return true;
 		}
 

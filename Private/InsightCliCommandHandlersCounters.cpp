@@ -21,13 +21,14 @@ bool HandleCountersCommands(const FInsightCliRequest& Request, const FTraceConte
 		FString FailureReason;
 		if (!BuildCounterCatalog(Context, Catalog, FailureStage, FailureReason))
 		{
-			TMap<FString, FString> Details;
-			Details.Add(TEXT("trace_path"), Context.FullPath);
-			Details.Add(TEXT("consumer"), TEXT("counters.list"));
-			Details.Add(TEXT("failure_stage"), FailureStage.IsEmpty() ? TEXT("counter_catalog") : FailureStage);
-			Details.Add(TEXT("failure_reason"), FailureReason.IsEmpty() ? TEXT("failed to build counter catalog") : FailureReason);
-			Details.Add(TEXT("data_source"), TEXT("unavailable"));
-			OutResponse = FInsightCliResponse::Error(10, TEXT("E3001"), TEXT("Trace-backed counters are unavailable for this trace."), Details);
+			OutResponse = MakeTraceUnavailableError(
+				Context,
+				TEXT("counters.list"),
+				FailureStage,
+				FailureReason,
+				TEXT("counter_catalog"),
+				TEXT("failed to build counter catalog"),
+				TEXT("Trace-backed counters are unavailable for this trace."));
 			return true;
 		}
 
@@ -71,13 +72,14 @@ bool HandleCountersCommands(const FInsightCliRequest& Request, const FTraceConte
 		FString CatalogFailureReason;
 		if (!BuildCounterCatalog(Context, Catalog, CatalogFailureStage, CatalogFailureReason))
 		{
-			TMap<FString, FString> Details;
-			Details.Add(TEXT("trace_path"), Context.FullPath);
-			Details.Add(TEXT("consumer"), TEXT("counters.series"));
-			Details.Add(TEXT("failure_stage"), CatalogFailureStage.IsEmpty() ? TEXT("counter_catalog") : CatalogFailureStage);
-			Details.Add(TEXT("failure_reason"), CatalogFailureReason.IsEmpty() ? TEXT("failed to build counter catalog") : CatalogFailureReason);
-			Details.Add(TEXT("data_source"), TEXT("unavailable"));
-			OutResponse = FInsightCliResponse::Error(10, TEXT("E3001"), TEXT("Trace-backed counters are unavailable for this trace."), Details);
+			OutResponse = MakeTraceUnavailableError(
+				Context,
+				TEXT("counters.series"),
+				CatalogFailureStage,
+				CatalogFailureReason,
+				TEXT("counter_catalog"),
+				TEXT("failed to build counter catalog"),
+				TEXT("Trace-backed counters are unavailable for this trace."));
 			return true;
 		}
 
@@ -129,14 +131,15 @@ bool HandleCountersCommands(const FInsightCliRequest& Request, const FTraceConte
 			bHasTimeStart ? TOptional<double>(TimeStartMs) : TOptional<double>(),
 			bHasTimeEnd ? TOptional<double>(TimeEndMs) : TOptional<double>()))
 		{
-			TMap<FString, FString> Details;
-			Details.Add(TEXT("trace_path"), Context.FullPath);
-			Details.Add(TEXT("consumer"), TEXT("counters.series"));
-			Details.Add(TEXT("counter_name"), CounterEntry->Name);
-			Details.Add(TEXT("failure_stage"), FailureStage.IsEmpty() ? TEXT("counter_series") : FailureStage);
-			Details.Add(TEXT("failure_reason"), FailureReason.IsEmpty() ? TEXT("failed to build counter series") : FailureReason);
-			Details.Add(TEXT("data_source"), TEXT("unavailable"));
-			OutResponse = FInsightCliResponse::Error(10, TEXT("E3001"), TEXT("Trace-backed counters are unavailable for this trace."), Details);
+			OutResponse = MakeTraceUnavailableError(
+				Context,
+				TEXT("counters.series"),
+				FailureStage,
+				FailureReason,
+				TEXT("counter_series"),
+				TEXT("failed to build counter series"),
+				TEXT("Trace-backed counters are unavailable for this trace."),
+				{{TEXT("counter_name"), CounterEntry->Name}});
 			return true;
 		}
 
@@ -188,13 +191,14 @@ bool HandleCountersCommands(const FInsightCliRequest& Request, const FTraceConte
 		FString CatalogFailureReason;
 		if (!BuildCounterCatalog(Context, Catalog, CatalogFailureStage, CatalogFailureReason))
 		{
-			TMap<FString, FString> Details;
-			Details.Add(TEXT("trace_path"), Context.FullPath);
-			Details.Add(TEXT("consumer"), TEXT("counters.stats"));
-			Details.Add(TEXT("failure_stage"), CatalogFailureStage.IsEmpty() ? TEXT("counter_catalog") : CatalogFailureStage);
-			Details.Add(TEXT("failure_reason"), CatalogFailureReason.IsEmpty() ? TEXT("failed to build counter catalog") : CatalogFailureReason);
-			Details.Add(TEXT("data_source"), TEXT("unavailable"));
-			OutResponse = FInsightCliResponse::Error(10, TEXT("E3001"), TEXT("Trace-backed counters are unavailable for this trace."), Details);
+			OutResponse = MakeTraceUnavailableError(
+				Context,
+				TEXT("counters.stats"),
+				CatalogFailureStage,
+				CatalogFailureReason,
+				TEXT("counter_catalog"),
+				TEXT("failed to build counter catalog"),
+				TEXT("Trace-backed counters are unavailable for this trace."));
 			return true;
 		}
 
@@ -234,14 +238,15 @@ bool HandleCountersCommands(const FInsightCliRequest& Request, const FTraceConte
 			FailureStage,
 			FailureReason))
 		{
-			TMap<FString, FString> Details;
-			Details.Add(TEXT("trace_path"), Context.FullPath);
-			Details.Add(TEXT("consumer"), TEXT("counters.stats"));
-			Details.Add(TEXT("counter_name"), CounterEntry->Name);
-			Details.Add(TEXT("failure_stage"), FailureStage.IsEmpty() ? TEXT("counter_series") : FailureStage);
-			Details.Add(TEXT("failure_reason"), FailureReason.IsEmpty() ? TEXT("failed to build counter series") : FailureReason);
-			Details.Add(TEXT("data_source"), TEXT("unavailable"));
-			OutResponse = FInsightCliResponse::Error(10, TEXT("E3001"), TEXT("Trace-backed counters are unavailable for this trace."), Details);
+			OutResponse = MakeTraceUnavailableError(
+				Context,
+				TEXT("counters.stats"),
+				FailureStage,
+				FailureReason,
+				TEXT("counter_series"),
+				TEXT("failed to build counter series"),
+				TEXT("Trace-backed counters are unavailable for this trace."),
+				{{TEXT("counter_name"), CounterEntry->Name}});
 			return true;
 		}
 
