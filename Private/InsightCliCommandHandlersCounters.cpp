@@ -68,41 +68,11 @@ bool HandleCountersCommands(const FInsightCliRequest& Request, const FTraceConte
 			return true;
 		}
 
-		TArray<FCounterCatalogEntry> Catalog;
-		FString CatalogFailureStage;
-		FString CatalogFailureReason;
-		if (!BuildCounterCatalog(Context, Catalog, CatalogFailureStage, CatalogFailureReason))
+		FCounterCatalogEntry CounterEntry;
+		FInsightCliResponse CounterError;
+		if (!ResolveCounterByName(Context, CounterName, TEXT("counters.series"), CounterEntry, CounterError))
 		{
-			OutResponse = MakeTraceUnavailableError(
-				Context,
-				TEXT("counters.series"),
-				CatalogFailureStage,
-				CatalogFailureReason,
-				TEXT("counter_catalog"),
-				TEXT("failed to build counter catalog"),
-				TEXT("Trace-backed counters are unavailable for this trace."));
-			return true;
-		}
-
-		const FCounterCatalogEntry* CounterEntry = Catalog.FindByPredicate([&CounterName](const FCounterCatalogEntry& Entry)
-		{
-			return Entry.Name.Equals(CounterName, ESearchCase::IgnoreCase);
-		});
-
-		if (CounterEntry == nullptr)
-		{
-			TArray<FString> CounterNames;
-			CounterNames.Reserve(Catalog.Num());
-			for (const FCounterCatalogEntry& Entry : Catalog)
-			{
-				CounterNames.Add(Entry.Name);
-			}
-			CounterNames.Sort();
-
-			TMap<FString, FString> Details;
-			Details.Add(TEXT("name"), CounterName);
-			Details.Add(TEXT("available_counters"), FString::Join(CounterNames, TEXT(",")));
-			OutResponse = FInsightCliResponse::Error(5, TEXT("E2001"), TEXT("Counter name not found."), Details);
+			OutResponse = CounterError;
 			return true;
 		}
 
@@ -121,7 +91,7 @@ bool HandleCountersCommands(const FInsightCliRequest& Request, const FTraceConte
 		FString FailureReason;
 		if (!BuildCounterSeries(
 			Context,
-			CounterEntry->Name,
+			CounterEntry.Name,
 			Series,
 			CounterType,
 			CounterUnit,
@@ -138,7 +108,7 @@ bool HandleCountersCommands(const FInsightCliRequest& Request, const FTraceConte
 				TEXT("counter_series"),
 				TEXT("failed to build counter series"),
 				TEXT("Trace-backed counters are unavailable for this trace."),
-				{{TEXT("counter_name"), CounterEntry->Name}});
+				{{TEXT("counter_name"), CounterEntry.Name}});
 			return true;
 		}
 
@@ -153,7 +123,7 @@ bool HandleCountersCommands(const FInsightCliRequest& Request, const FTraceConte
 		}
 
 		TMap<FString, FString> Meta;
-		Meta.Add(TEXT("counter_name"), CounterEntry->Name);
+		Meta.Add(TEXT("counter_name"), CounterEntry.Name);
 		Meta.Add(TEXT("counter_type"), CounterType);
 		Meta.Add(TEXT("counter_unit"), CounterUnit);
 		Meta.Add(TEXT("data_source"), TEXT("trace"));
@@ -186,41 +156,11 @@ bool HandleCountersCommands(const FInsightCliRequest& Request, const FTraceConte
 			return true;
 		}
 
-		TArray<FCounterCatalogEntry> Catalog;
-		FString CatalogFailureStage;
-		FString CatalogFailureReason;
-		if (!BuildCounterCatalog(Context, Catalog, CatalogFailureStage, CatalogFailureReason))
+		FCounterCatalogEntry CounterEntry;
+		FInsightCliResponse CounterError;
+		if (!ResolveCounterByName(Context, CounterName, TEXT("counters.stats"), CounterEntry, CounterError))
 		{
-			OutResponse = MakeTraceUnavailableError(
-				Context,
-				TEXT("counters.stats"),
-				CatalogFailureStage,
-				CatalogFailureReason,
-				TEXT("counter_catalog"),
-				TEXT("failed to build counter catalog"),
-				TEXT("Trace-backed counters are unavailable for this trace."));
-			return true;
-		}
-
-		const FCounterCatalogEntry* CounterEntry = Catalog.FindByPredicate([&CounterName](const FCounterCatalogEntry& Entry)
-		{
-			return Entry.Name.Equals(CounterName, ESearchCase::IgnoreCase);
-		});
-
-		if (CounterEntry == nullptr)
-		{
-			TArray<FString> CounterNames;
-			CounterNames.Reserve(Catalog.Num());
-			for (const FCounterCatalogEntry& Entry : Catalog)
-			{
-				CounterNames.Add(Entry.Name);
-			}
-			CounterNames.Sort();
-
-			TMap<FString, FString> Details;
-			Details.Add(TEXT("name"), CounterName);
-			Details.Add(TEXT("available_counters"), FString::Join(CounterNames, TEXT(",")));
-			OutResponse = FInsightCliResponse::Error(5, TEXT("E2001"), TEXT("Counter name not found."), Details);
+			OutResponse = CounterError;
 			return true;
 		}
 
@@ -231,7 +171,7 @@ bool HandleCountersCommands(const FInsightCliRequest& Request, const FTraceConte
 		FString FailureReason;
 		if (!BuildCounterSeries(
 			Context,
-			CounterEntry->Name,
+			CounterEntry.Name,
 			Series,
 			CounterType,
 			CounterUnit,
@@ -246,7 +186,7 @@ bool HandleCountersCommands(const FInsightCliRequest& Request, const FTraceConte
 				TEXT("counter_series"),
 				TEXT("failed to build counter series"),
 				TEXT("Trace-backed counters are unavailable for this trace."),
-				{{TEXT("counter_name"), CounterEntry->Name}});
+				{{TEXT("counter_name"), CounterEntry.Name}});
 			return true;
 		}
 
@@ -254,7 +194,7 @@ bool HandleCountersCommands(const FInsightCliRequest& Request, const FTraceConte
 		Meta.Add(TEXT("counter_type"), CounterType);
 		Meta.Add(TEXT("counter_unit"), CounterUnit);
 		Meta.Add(TEXT("data_source"), TEXT("trace"));
-		OutResponse = FInsightCliResponse::Ok(MakeEnvelopeWithObject(MakeCounterStatsObject(Series, CounterEntry->Name), Meta));
+		OutResponse = FInsightCliResponse::Ok(MakeEnvelopeWithObject(MakeCounterStatsObject(Series, CounterEntry.Name), Meta));
 		return true;
 	}
 

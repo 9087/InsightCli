@@ -268,6 +268,12 @@ bool BuildCounterCatalog(
 	TArray<FCounterCatalogEntry>& OutCatalog,
 	FString& OutFailureStage,
 	FString& OutFailureReason);
+bool ResolveCounterByName(
+	const FTraceContext& Context,
+	const FString& RequestedName,
+	const TCHAR* OwnerCommand,
+	FCounterCatalogEntry& OutEntry,
+	FInsightCliResponse& OutError);
 bool BuildCounterSeries(
 	const FTraceContext& Context,
 	const FString& CounterName,
