@@ -1066,7 +1066,7 @@ bool BuildCpuTopSamples(const FTraceContext& Context, const TOptional<uint32>& C
 		{
 			FCpuScopeSample Sample;
 			Sample.ScopeName = Row->Timer->Name != nullptr ? Row->Timer->Name : TEXT("<unknown>");
-			Sample.ThreadId = CpuThreadId.IsSet() ? static_cast<int32>(CpuThreadId.GetValue()) : 0;
+			Sample.ThreadId = CpuThreadId.IsSet() ? static_cast<int32>(CpuThreadId.GetValue()) : -1;
 			Sample.CallCount = (Row->InstanceCount > static_cast<uint64>(MAX_int32)) ? MAX_int32 : static_cast<int32>(Row->InstanceCount);
 			Sample.TotalMs = Row->TotalInclusiveTime * 1000.0;
 			Sample.AvgMs = Row->AverageInclusiveTime * 1000.0;

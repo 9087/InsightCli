@@ -66,7 +66,8 @@ struct FTraceContext
 struct FCpuScopeSample
 {
 	FString ScopeName;
-	int32 ThreadId = 42;
+	// -1 means unspecified; non-negative values are trace-backed thread IDs.
+	int32 ThreadId = -1;
 	int32 CallCount = 0;
 	double TotalMs = 0.0;
 	double AvgMs = 0.0;
@@ -87,7 +88,7 @@ struct FGpuScopeSample
 struct FThreadWaitSample
 {
 	int32 FrameIndex = 0;
-	int32 ThreadId = 42;
+	int32 ThreadId = -1;
 	FString ThreadName;
 	FString WaitType;
 	FString WaitObject;
@@ -121,7 +122,7 @@ struct FTaskSample
 	double CriticalPathMs = 0.0;
 	int32 CriticalPathDepth = 0;
 	TArray<int32> CriticalPathTaskChain;
-	int32 WorkerThreadId = 77;
+	int32 WorkerThreadId = -1;
 };
 
 struct FCounterPoint
@@ -150,7 +151,7 @@ struct FMarkSample
 	FString Category;
 	FString Channel;
 	FString Message;
-	int32 ThreadId = 42;
+	int32 ThreadId = -1;
 };
 
 struct FMarksFilter
