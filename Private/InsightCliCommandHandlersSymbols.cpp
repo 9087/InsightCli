@@ -1,0 +1,58 @@
+// Copyright Epic Games, Inc. All Rights Reserved.
+
+#include "InsightCliCommandContext.h"
+
+namespace UE::InsightCli::Internal
+{
+bool HandleSymbolsCommands(const FInsightCliRequest& Request, const FTraceContext& Context, FInsightCliResponse& OutResponse)
+{
+	// Handles symbols/resolve with data-driven matching behavior.
+	if (Request.Group == TEXT("symbols") && Request.Action == TEXT("resolve"))
+	{
+		FInsightCliResponse UnknownOptionError;
+		if (!ValidateNoUnknownOptionsWithGlobals(Request.Args, { TEXT("name") }, UnknownOptionError))
+		{
+			OutResponse = UnknownOptionError;
+			return true;
+		}
+
+		FString ScopeName;
+		if (!TryGetStringOption(Request.Args, TEXT("--name"), ScopeName))
+		{
+			OutResponse = FInsightCliResponse::Error(4, TEXT("E1003"), TEXT("--name is required for symbols resolve."));
+			return true;
+		}
+
+		TSharedPtr<FJsonObject> DataObject;
+		bool bFound = false;
+		FString FailureStage;
+		FString FailureReason;
+		if (!BuildSymbolsResolveObject(Context, ScopeName, DataObject, bFound, FailureStage, FailureReason))
+		{
+			TMap<FString, FString> Details;
+			Details.Add(TEXT("trace_path"), Context.FullPath);
+			Details.Add(TEXT("consumer"), TEXT("symbols.resolve"));
+			Details.Add(TEXT("failure_stage"), FailureStage.IsEmpty() ? TEXT("symbol_lookup") : FailureStage);
+			Details.Add(TEXT("failure_reason"), FailureReason.IsEmpty() ? TEXT("failed to resolve symbols from trace") : FailureReason);
+			Details.Add(TEXT("data_source"), TEXT("unavailable"));
+			OutResponse = FInsightCliResponse::Error(10, TEXT("E3001"), TEXT("Trace-backed symbol resolution is unavailable for this trace."), Details);
+			return true;
+		}
+
+		if (!bFound || !DataObject.IsValid())
+		{
+			TMap<FString, FString> Meta = MakeNotFoundMeta(Request, TEXT("not_found"), TEXT("name"), ScopeName);
+			Meta.Add(TEXT("data_source"), TEXT("trace"));
+			OutResponse = FInsightCliResponse::Ok(MakeEnvelopeWithObject(MakeShared<FJsonObject>(), Meta));
+			return true;
+		}
+
+		TMap<FString, FString> Meta;
+		Meta.Add(TEXT("data_source"), TEXT("trace"));
+		OutResponse = FInsightCliResponse::Ok(MakeEnvelopeWithObject(DataObject.ToSharedRef(), Meta));
+		return true;
+	}
+
+	return false;
+}
+}

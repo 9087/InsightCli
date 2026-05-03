@@ -1,0 +1,18 @@
+{
+  "generated_at": "2026-05-01",
+  "source": "design-docs/archive/TEMP-Lightweight-Startup-Plan.md",
+  "commands": {
+    "info summary": {
+      "p50": 247.5,
+      "p95": 295.5
+    },
+    "frames summary": {
+      "p50": 246.0,
+      "p95": 283.6
+    },
+    "cpu top --thread GameThread --limit 3": {
+      "p50": 258.2,
+      "p95": 295.6
+    }
+  }
+}
