@@ -3,8 +3,6 @@
 #include "InsightCliCommandContext.h"
 
 #include "Containers/UnrealString.h"
-#include "HAL/PlatformMisc.h"
-#include "Misc/Paths.h"
 #include "TraceServices/AnalysisService.h"
 #include "TraceServices/Containers/Tables.h"
 #include "TraceServices/Model/AnalysisSession.h"
@@ -15,27 +13,6 @@ namespace UE::InsightCli::Internal
 {
 namespace
 {
-bool IsDecompStrictGuardBypassed()
-{
-	static TOptional<bool> bCachedBypass;
-	if (bCachedBypass.IsSet())
-	{
-		return bCachedBypass.GetValue();
-	}
-
-	FString Value = FPlatformMisc::GetEnvironmentVariable(TEXT("INSIGHTCLI_ALLOW_DECOMP_STRICT"));
-	Value.TrimStartAndEndInline();
-
-	const bool bBypass =
-		Value.Equals(TEXT("1"), ESearchCase::CaseSensitive) ||
-		Value.Equals(TEXT("true"), ESearchCase::IgnoreCase) ||
-		Value.Equals(TEXT("yes"), ESearchCase::IgnoreCase) ||
-		Value.Equals(TEXT("on"), ESearchCase::IgnoreCase);
-
-	bCachedBypass = bBypass;
-	return bBypass;
-}
-
 bool TryParseInt(const FString& Text, int32& OutValue)
 {
 	if (Text.IsEmpty())
@@ -63,14 +40,6 @@ bool TryParseInt(const FString& Text, int32& OutValue)
 
 bool ResolveCpuThreadFilterToTraceId(const FTraceContext& Context, const FString& ThreadFilter, uint32& OutThreadId, FString& OutNormalizedThread, FString& OutFailureStage, FString& OutFailureReason)
 {
-	const FString TraceFileName = FPaths::GetCleanFilename(Context.FullPath);
-	if (TraceFileName.Contains(TEXT(".decomp."), ESearchCase::IgnoreCase) && !IsDecompStrictGuardBypassed())
-	{
-		OutFailureStage = TEXT("compatibility_guard");
-		OutFailureReason = TEXT("decomp_trace_not_supported_in_strict_mode");
-		return false;
-	}
-
 	int32 ParsedThreadId = -1;
 	if (TryParseInt(ThreadFilter, ParsedThreadId) && ParsedThreadId >= 0)
 	{
@@ -150,14 +119,6 @@ bool BuildCpuTopSamples(const FTraceContext& Context, const TOptional<uint32>& C
 	OutSamples.Reset();
 	OutFailureStage.Reset();
 	OutFailureReason.Reset();
-
-	const FString TraceFileName = FPaths::GetCleanFilename(Context.FullPath);
-	if (TraceFileName.Contains(TEXT(".decomp."), ESearchCase::IgnoreCase) && !IsDecompStrictGuardBypassed())
-	{
-		OutFailureStage = TEXT("compatibility_guard");
-		OutFailureReason = TEXT("decomp_trace_not_supported_in_strict_mode");
-		return false;
-	}
 
 	TSharedPtr<const TraceServices::IAnalysisSession> Session;
 	if (!AcquireAnalysisSession(Context, Session, OutFailureStage, OutFailureReason))

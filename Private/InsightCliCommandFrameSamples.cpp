@@ -2,8 +2,6 @@
 
 #include "InsightCliCommandContext.h"
 
-#include "HAL/PlatformMisc.h"
-#include "Misc/Paths.h"
 #include "TraceServices/Model/AnalysisSession.h"
 #include "TraceServices/Model/Frames.h"
 
@@ -11,27 +9,6 @@ namespace UE::InsightCli::Internal
 {
 namespace
 {
-bool IsDecompStrictGuardBypassed()
-{
-	static TOptional<bool> bCachedBypass;
-	if (bCachedBypass.IsSet())
-	{
-		return bCachedBypass.GetValue();
-	}
-
-	FString Value = FPlatformMisc::GetEnvironmentVariable(TEXT("INSIGHTCLI_ALLOW_DECOMP_STRICT"));
-	Value.TrimStartAndEndInline();
-
-	const bool bBypass =
-		Value.Equals(TEXT("1"), ESearchCase::CaseSensitive) ||
-		Value.Equals(TEXT("true"), ESearchCase::IgnoreCase) ||
-		Value.Equals(TEXT("yes"), ESearchCase::IgnoreCase) ||
-		Value.Equals(TEXT("on"), ESearchCase::IgnoreCase);
-
-	bCachedBypass = bBypass;
-	return bBypass;
-}
-
 void SetFrameSampleFailure(const FTraceContext& Context, const TCHAR* Stage, const TCHAR* Reason)
 {
 	Context.bFrameSamplesTraceBacked = false;
@@ -61,13 +38,6 @@ TArray<FFrameSample> BuildFrameSamples(const FTraceContext& Context)
 	Context.TraceDurationMs = 0.0;
 	Context.FrameSamplesFailureStage.Reset();
 	Context.FrameSamplesFailureReason.Reset();
-
-	const FString TraceFileName = FPaths::GetCleanFilename(Context.FullPath);
-	if (TraceFileName.Contains(TEXT(".decomp."), ESearchCase::IgnoreCase) && !IsDecompStrictGuardBypassed())
-	{
-		SetFrameSampleFailure(Context, TEXT("compatibility_guard"), TEXT("decomp_trace_not_supported_in_strict_mode"));
-		return Context.CachedFrameSamples;
-	}
 
 	TSharedPtr<const TraceServices::IAnalysisSession> Session;
 	FString AnalysisFailureStage;
