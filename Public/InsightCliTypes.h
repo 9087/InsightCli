@@ -24,6 +24,5 @@ struct FInsightCliResponse
 	static FInsightCliResponse Error(int32 InExitCode, const FString& InCode, const FString& InMessage, const TMap<FString, FString>& InDetails = {});
 };
 
-FString MakeSuccessEnvelope(const TMap<FString, FString>& InData, const TMap<FString, FString>& InMeta);
 FString MakeErrorEnvelope(const FString& InCode, const FString& InMessage, const TMap<FString, FString>& InDetails = {});
 }

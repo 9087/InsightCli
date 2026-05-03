@@ -44,17 +44,6 @@ FInsightCliResponse FInsightCliResponse::Error(int32 InExitCode, const FString& 
 	return Response;
 }
 
-FString MakeSuccessEnvelope(const TMap<FString, FString>& InData, const TMap<FString, FString>& InMeta)
-{
-	const TSharedRef<FJsonObject> Root = MakeShared<FJsonObject>();
-	Root->SetObjectField(TEXT("data"), MakeObjectFromMap(InData));
-	if (!InMeta.IsEmpty())
-	{
-		Root->SetObjectField(TEXT("meta"), MakeObjectFromMap(InMeta));
-	}
-	return SerializeJson(Root);
-}
-
 FString MakeErrorEnvelope(const FString& InCode, const FString& InMessage, const TMap<FString, FString>& InDetails)
 {
 	const TSharedRef<FJsonObject> Root = MakeShared<FJsonObject>();
