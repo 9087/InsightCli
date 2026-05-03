@@ -1,0 +1,171 @@
+// Copyright Epic Games, Inc. All Rights Reserved.
+
+#include "InsightCliCommandContext.h"
+
+#include "Misc/Paths.h"
+#include "TraceServices/Model/AnalysisSession.h"
+#include "TraceServices/Model/Threads.h"
+
+namespace UE::InsightCli::Internal
+{
+void ApplyTimeWindowFilter(TArray<FFrameSample>& Frames, const TArray<FString>& Args, bool& bUsedWindow, FInsightCliResponse& OutError)
+{
+	bUsedWindow = false;
+	double Start = 0.0;
+	double End = 0.0;
+	const bool bHasStart = TryGetDoubleOption(Args, TEXT("--time-start"), Start);
+	const bool bHasEnd = TryGetDoubleOption(Args, TEXT("--time-end"), End);
+
+	if (!bHasStart && !bHasEnd)
+	{
+		return;
+	}
+
+	bUsedWindow = true;
+	if (bHasStart && bHasEnd && Start > End)
+	{
+		OutError = FInsightCliResponse::Error(4, TEXT("E1003"), TEXT("time-start must be <= time-end."));
+		return;
+	}
+
+	const double EffectiveStart = bHasStart ? Start : 0.0;
+	const double EffectiveEnd = bHasEnd ? End : TNumericLimits<double>::Max();
+	Frames = Frames.FilterByPredicate([EffectiveStart, EffectiveEnd](const FFrameSample& Sample)
+	{
+		return Sample.FrameStartMs >= EffectiveStart && Sample.FrameStartMs < EffectiveEnd;
+	});
+}
+
+TSharedRef<FJsonObject> MakeInfoSummaryData(const FTraceContext& Context)
+{
+	const TArray<FFrameSample> Frames = BuildFrameSamples(Context);
+	const double DurationMs = (Context.TraceDurationMs > 0.0) ? Context.TraceDurationMs : (!Frames.IsEmpty() ? Frames.Last().FrameEndMs : 0.0);
+	const FString StartTimestamp = Context.TimeStamp.ToIso8601();
+	const FString EndTimestamp = (DurationMs > 0.0)
+		? (Context.TimeStamp + FTimespan::FromMilliseconds(DurationMs)).ToIso8601()
+		: TEXT("unavailable");
+
+	FString ThreadCount = TEXT("unavailable");
+	FString ThreadCountReason;
+	{
+		TSharedPtr<const TraceServices::IAnalysisSession> Session;
+		FString FailureStage;
+		FString FailureReason;
+		if (AcquireAnalysisSession(Context, Session, FailureStage, FailureReason))
+		{
+			int32 ThreadTotal = 0;
+			bool bHasThreadProvider = false;
+			{
+				TraceServices::FAnalysisSessionReadScope SessionReadScope(*Session.Get());
+				const TraceServices::IThreadProvider* ThreadProvider = Session->ReadProvider<TraceServices::IThreadProvider>(TraceServices::GetThreadProviderName());
+				if (ThreadProvider != nullptr)
+				{
+					bHasThreadProvider = true;
+					ThreadProvider->EnumerateThreads([&ThreadTotal](const TraceServices::FThreadInfo&)
+					{
+						++ThreadTotal;
+					});
+				}
+			}
+
+			if (bHasThreadProvider)
+			{
+				ThreadCount = FString::FromInt(ThreadTotal);
+			}
+			else
+			{
+				ThreadCountReason = TEXT("thread_provider_not_available");
+			}
+		}
+		else
+		{
+			ThreadCountReason = FString::Printf(TEXT("analysis_session_unavailable:%s:%s"), *FailureStage, *FailureReason);
+		}
+	}
+
+	const TSharedRef<FJsonObject> Data = MakeShared<FJsonObject>();
+	Data->SetStringField(TEXT("trace_name"), FPaths::GetCleanFilename(Context.FullPath));
+	Data->SetStringField(TEXT("trace_path"), Context.FullPath);
+	Data->SetStringField(TEXT("trace_size_bytes"), FString::Printf(TEXT("%lld"), Context.FileSize));
+	Data->SetStringField(TEXT("start_timestamp"), StartTimestamp);
+	Data->SetStringField(TEXT("start_timestamp_source"), TEXT("recorded_at_file_mtime"));
+	Data->SetStringField(TEXT("end_timestamp"), EndTimestamp);
+	Data->SetStringField(TEXT("duration_ms"), FString::Printf(TEXT("%.3f"), DurationMs));
+	Data->SetStringField(TEXT("thread_count"), ThreadCount);
+	if (!ThreadCountReason.IsEmpty())
+	{
+		Data->SetStringField(TEXT("thread_count_reason"), ThreadCountReason);
+	}
+	Data->SetStringField(TEXT("event_count"), TEXT("unavailable"));
+	Data->SetStringField(TEXT("event_count_reason"), TEXT("trace_event_count_not_exposed"));
+	Data->SetStringField(TEXT("data_source"), Context.bFrameSamplesTraceBacked ? TEXT("trace") : TEXT("unavailable"));
+	Data->SetNumberField(TEXT("game_frame_count"), Context.TraceGameFrameCount);
+	Data->SetNumberField(TEXT("rendering_frame_count"), Context.TraceRenderingFrameCount);
+	if (Context.bFrameSamplesFailed)
+	{
+		Data->SetStringField(TEXT("trace_parse_failure_stage"), Context.FrameSamplesFailureStage);
+		Data->SetStringField(TEXT("trace_parse_failure_reason"), Context.FrameSamplesFailureReason);
+	}
+	Data->SetStringField(TEXT("platform"), FPlatformProperties::IniPlatformName());
+	Data->SetStringField(TEXT("build_version"), TEXT("unavailable"));
+	Data->SetStringField(TEXT("build_version_reason"), TEXT("trace_build_version_not_exposed"));
+	return Data;
+}
+
+TSharedRef<FJsonObject> MakeFramesSummaryData(const TArray<FFrameSample>& Frames)
+{
+	const TSharedRef<FJsonObject> Data = MakeShared<FJsonObject>();
+	if (Frames.IsEmpty())
+	{
+		return Data;
+	}
+
+	TArray<double> SortedTimes;
+	SortedTimes.Reserve(Frames.Num());
+	double Sum = 0.0;
+	double MinValue = TNumericLimits<double>::Max();
+	double MaxValue = 0.0;
+
+	for (const FFrameSample& Sample : Frames)
+	{
+		SortedTimes.Add(Sample.FrameTimeMs);
+		Sum += Sample.FrameTimeMs;
+		MinValue = FMath::Min(MinValue, Sample.FrameTimeMs);
+		MaxValue = FMath::Max(MaxValue, Sample.FrameTimeMs);
+	}
+
+	SortedTimes.Sort();
+	const auto PercentileValue = [&SortedTimes](const double Ratio)
+	{
+		const int32 Index = FMath::Clamp(static_cast<int32>(FMath::FloorToDouble(Ratio * (SortedTimes.Num() - 1))), 0, SortedTimes.Num() - 1);
+		return SortedTimes[Index];
+	};
+
+	Data->SetNumberField(TEXT("frame_count"), Frames.Num());
+	Data->SetNumberField(TEXT("avg_frame_ms"), Sum / Frames.Num());
+	Data->SetNumberField(TEXT("max_frame_ms"), MaxValue);
+	Data->SetNumberField(TEXT("min_frame_ms"), MinValue);
+	Data->SetNumberField(TEXT("p50"), PercentileValue(0.50));
+	Data->SetNumberField(TEXT("p90"), PercentileValue(0.90));
+	Data->SetNumberField(TEXT("p95"), PercentileValue(0.95));
+	Data->SetNumberField(TEXT("p99"), PercentileValue(0.99));
+	return Data;
+}
+
+TSharedRef<FJsonObject> MakeFrameObject(const FFrameSample& Sample)
+{
+	const TSharedRef<FJsonObject> Item = MakeShared<FJsonObject>();
+	Item->SetNumberField(TEXT("frame_index"), Sample.FrameIndex);
+	Item->SetNumberField(TEXT("frame_start_ms"), Sample.FrameStartMs);
+	Item->SetNumberField(TEXT("frame_end_ms"), Sample.FrameEndMs);
+	Item->SetNumberField(TEXT("frame_time_ms"), Sample.FrameTimeMs);
+	Item->SetNumberField(TEXT("game_thread_ms"), Sample.GameThreadMs);
+	Item->SetNumberField(TEXT("render_thread_ms"), Sample.RenderThreadMs);
+	Item->SetNumberField(TEXT("rhi_thread_ms"), Sample.RhiThreadMs);
+	Item->SetNumberField(TEXT("gpu_ms"), Sample.GpuMs);
+	Item->SetNumberField(TEXT("game_frame_index"), Sample.GameFrameIndex);
+	Item->SetNumberField(TEXT("rendering_frame_index"), Sample.RenderingFrameIndex);
+	Item->SetStringField(TEXT("data_source"), Sample.bTraceBacked ? TEXT("trace") : TEXT("unavailable"));
+	return Item;
+}
+}
