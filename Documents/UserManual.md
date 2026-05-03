@@ -119,6 +119,7 @@ Sample output:
 Notes:
 - start_timestamp is derived from trace file mtime and is an approximate recording start marker.
 - end_timestamp is computed as start_timestamp + duration_ms; when duration_ms is zero, end_timestamp is unavailable.
+- `thread_id = -1` means the field is unspecified for that row and does not map to a concrete trace thread id.
 
 ## 5.2 `frames summary`
 

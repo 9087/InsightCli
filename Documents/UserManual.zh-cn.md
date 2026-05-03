@@ -119,6 +119,7 @@ InsightCli.exe C:/traces/run01.utrace info summary
 说明：
 - start_timestamp 来自 trace 文件 mtime，表示近似录制起点。
 - end_timestamp 由 start_timestamp + duration_ms 推导；当 duration_ms 为 0 时，end_timestamp 为 unavailable。
+- `thread_id = -1` 表示该行字段未指定（unspecified），不对应具体的 trace 线程 ID。
 
 ## 5.2 `frames summary`
 
