@@ -16,20 +16,18 @@ bool HandleMemoryCommands(const FInsightCliRequest& Request, const FTraceContext
 			return true;
 		}
 
-		double Start = 0.0;
-		double End = 0.0;
-		const bool bHasStart = TryGetDoubleOption(Request.Args, TEXT("--time-start"), Start);
-		const bool bHasEnd = TryGetDoubleOption(Request.Args, TEXT("--time-end"), End);
-		if (bHasStart && bHasEnd && Start > End)
+		FTimeWindowMs TimeWindow;
+		FInsightCliResponse TimeWindowError;
+		if (!TryGetTimeWindowMs(Request.Args, TimeWindow, TimeWindowError))
 		{
-			OutResponse = FInsightCliResponse::Error(4, TEXT("E1003"), TEXT("time-start must be <= time-end."));
+			OutResponse = TimeWindowError;
 			return true;
 		}
 
 		TArray<FMemorySample> Samples;
 		FString FailureStage;
 		FString FailureReason;
-		if (!BuildMemorySamplesTrace(Context, Samples, FailureStage, FailureReason, bHasStart ? TOptional<double>(Start) : TOptional<double>(), bHasEnd ? TOptional<double>(End) : TOptional<double>()))
+		if (!BuildMemorySamplesTrace(Context, Samples, FailureStage, FailureReason, TimeWindow.StartMs, TimeWindow.EndMs))
 		{
 			OutResponse = MakeTraceUnavailableError(
 				Context,
@@ -44,13 +42,13 @@ bool HandleMemoryCommands(const FInsightCliRequest& Request, const FTraceContext
 
 		TMap<FString, FString> Meta;
 		Meta.Add(TEXT("data_source"), TEXT("trace"));
-		if (bHasStart)
+		if (TimeWindow.StartMs.IsSet())
 		{
-			Meta.Add(TEXT("time_start_ms"), ToNumberString(Start));
+			Meta.Add(TEXT("time_start_ms"), ToNumberString(TimeWindow.StartMs.GetValue()));
 		}
-		if (bHasEnd)
+		if (TimeWindow.EndMs.IsSet())
 		{
-			Meta.Add(TEXT("time_end_ms"), ToNumberString(End));
+			Meta.Add(TEXT("time_end_ms"), ToNumberString(TimeWindow.EndMs.GetValue()));
 		}
 		OutResponse = FInsightCliResponse::Ok(MakeEnvelopeWithObject(MakeMemorySummaryObject(Samples), Meta));
 		return true;
@@ -65,20 +63,18 @@ bool HandleMemoryCommands(const FInsightCliRequest& Request, const FTraceContext
 			return true;
 		}
 
-		double Start = 0.0;
-		double End = 0.0;
-		const bool bHasStart = TryGetDoubleOption(Request.Args, TEXT("--time-start"), Start);
-		const bool bHasEnd = TryGetDoubleOption(Request.Args, TEXT("--time-end"), End);
-		if (bHasStart && bHasEnd && Start > End)
+		FTimeWindowMs TimeWindow;
+		FInsightCliResponse TimeWindowError;
+		if (!TryGetTimeWindowMs(Request.Args, TimeWindow, TimeWindowError))
 		{
-			OutResponse = FInsightCliResponse::Error(4, TEXT("E1003"), TEXT("time-start must be <= time-end."));
+			OutResponse = TimeWindowError;
 			return true;
 		}
 
 		TArray<FMemorySample> Samples;
 		FString FailureStage;
 		FString FailureReason;
-		if (!BuildMemorySamplesTrace(Context, Samples, FailureStage, FailureReason, bHasStart ? TOptional<double>(Start) : TOptional<double>(), bHasEnd ? TOptional<double>(End) : TOptional<double>()))
+		if (!BuildMemorySamplesTrace(Context, Samples, FailureStage, FailureReason, TimeWindow.StartMs, TimeWindow.EndMs))
 		{
 			OutResponse = MakeTraceUnavailableError(
 				Context,
@@ -93,13 +89,13 @@ bool HandleMemoryCommands(const FInsightCliRequest& Request, const FTraceContext
 
 		TMap<FString, FString> Meta;
 		Meta.Add(TEXT("data_source"), TEXT("trace"));
-		if (bHasStart)
+		if (TimeWindow.StartMs.IsSet())
 		{
-			Meta.Add(TEXT("time_start_ms"), ToNumberString(Start));
+			Meta.Add(TEXT("time_start_ms"), ToNumberString(TimeWindow.StartMs.GetValue()));
 		}
-		if (bHasEnd)
+		if (TimeWindow.EndMs.IsSet())
 		{
-			Meta.Add(TEXT("time_end_ms"), ToNumberString(End));
+			Meta.Add(TEXT("time_end_ms"), ToNumberString(TimeWindow.EndMs.GetValue()));
 		}
 		OutResponse = FInsightCliResponse::Ok(MakeEnvelopeWithObject(MakeMemoryPeakObject(Samples), Meta));
 		return true;
@@ -115,27 +111,25 @@ bool HandleMemoryCommands(const FInsightCliRequest& Request, const FTraceContext
 		}
 
 		int32 Limit = 100;
-		const bool bHasLimit = TryGetIntOption(Request.Args, TEXT("--limit"), Limit);
-		if (bHasLimit && Limit <= 0)
+		FInsightCliResponse LimitError;
+		if (!TryGetPositiveLimit(Request.Args, 100, Limit, LimitError))
 		{
-			OutResponse = FInsightCliResponse::Error(4, TEXT("E1003"), TEXT("limit must be > 0."));
+			OutResponse = LimitError;
 			return true;
 		}
 
-		double Start = 0.0;
-		double End = 0.0;
-		const bool bHasStart = TryGetDoubleOption(Request.Args, TEXT("--time-start"), Start);
-		const bool bHasEnd = TryGetDoubleOption(Request.Args, TEXT("--time-end"), End);
-		if (bHasStart && bHasEnd && Start > End)
+		FTimeWindowMs TimeWindow;
+		FInsightCliResponse TimeWindowError;
+		if (!TryGetTimeWindowMs(Request.Args, TimeWindow, TimeWindowError))
 		{
-			OutResponse = FInsightCliResponse::Error(4, TEXT("E1003"), TEXT("time-start must be <= time-end."));
+			OutResponse = TimeWindowError;
 			return true;
 		}
 
 		TArray<FMemorySample> Samples;
 		FString FailureStage;
 		FString FailureReason;
-		if (!BuildMemorySamplesTrace(Context, Samples, FailureStage, FailureReason, bHasStart ? TOptional<double>(Start) : TOptional<double>(), bHasEnd ? TOptional<double>(End) : TOptional<double>()))
+		if (!BuildMemorySamplesTrace(Context, Samples, FailureStage, FailureReason, TimeWindow.StartMs, TimeWindow.EndMs))
 		{
 			OutResponse = MakeTraceUnavailableError(
 				Context,
@@ -164,13 +158,13 @@ bool HandleMemoryCommands(const FInsightCliRequest& Request, const FTraceContext
 		TMap<FString, FString> Meta;
 		Meta.Add(TEXT("data_source"), TEXT("trace"));
 		Meta.Add(TEXT("limit"), FString::FromInt(Limit));
-		if (bHasStart)
+		if (TimeWindow.StartMs.IsSet())
 		{
-			Meta.Add(TEXT("time_start_ms"), ToNumberString(Start));
+			Meta.Add(TEXT("time_start_ms"), ToNumberString(TimeWindow.StartMs.GetValue()));
 		}
-		if (bHasEnd)
+		if (TimeWindow.EndMs.IsSet())
 		{
-			Meta.Add(TEXT("time_end_ms"), ToNumberString(End));
+			Meta.Add(TEXT("time_end_ms"), ToNumberString(TimeWindow.EndMs.GetValue()));
 		}
 		OutResponse = FInsightCliResponse::Ok(MakeEnvelopeWithArray(Data, Meta));
 		return true;
@@ -186,27 +180,25 @@ bool HandleMemoryCommands(const FInsightCliRequest& Request, const FTraceContext
 		}
 
 		int32 Limit = 100;
-		const bool bHasLimit = TryGetIntOption(Request.Args, TEXT("--limit"), Limit);
-		if (bHasLimit && Limit <= 0)
+		FInsightCliResponse LimitError;
+		if (!TryGetPositiveLimit(Request.Args, 100, Limit, LimitError))
 		{
-			OutResponse = FInsightCliResponse::Error(4, TEXT("E1003"), TEXT("limit must be > 0."));
+			OutResponse = LimitError;
 			return true;
 		}
 
-		double Start = 0.0;
-		double End = 0.0;
-		const bool bHasStart = TryGetDoubleOption(Request.Args, TEXT("--time-start"), Start);
-		const bool bHasEnd = TryGetDoubleOption(Request.Args, TEXT("--time-end"), End);
-		if (bHasStart && bHasEnd && Start > End)
+		FTimeWindowMs TimeWindow;
+		FInsightCliResponse TimeWindowError;
+		if (!TryGetTimeWindowMs(Request.Args, TimeWindow, TimeWindowError))
 		{
-			OutResponse = FInsightCliResponse::Error(4, TEXT("E1003"), TEXT("time-start must be <= time-end."));
+			OutResponse = TimeWindowError;
 			return true;
 		}
 
 		TArray<FMemoryTagSample> Tags;
 		FString FailureStage;
 		FString FailureReason;
-		if (!BuildMemoryTagsTrace(Context, Tags, FailureStage, FailureReason, bHasStart ? TOptional<double>(Start) : TOptional<double>(), bHasEnd ? TOptional<double>(End) : TOptional<double>()))
+		if (!BuildMemoryTagsTrace(Context, Tags, FailureStage, FailureReason, TimeWindow.StartMs, TimeWindow.EndMs))
 		{
 			OutResponse = MakeTraceUnavailableError(
 				Context,
@@ -230,13 +222,13 @@ bool HandleMemoryCommands(const FInsightCliRequest& Request, const FTraceContext
 		TMap<FString, FString> Meta;
 		Meta.Add(TEXT("data_source"), TEXT("trace"));
 		Meta.Add(TEXT("limit"), FString::FromInt(Limit));
-		if (bHasStart)
+		if (TimeWindow.StartMs.IsSet())
 		{
-			Meta.Add(TEXT("time_start_ms"), ToNumberString(Start));
+			Meta.Add(TEXT("time_start_ms"), ToNumberString(TimeWindow.StartMs.GetValue()));
 		}
-		if (bHasEnd)
+		if (TimeWindow.EndMs.IsSet())
 		{
-			Meta.Add(TEXT("time_end_ms"), ToNumberString(End));
+			Meta.Add(TEXT("time_end_ms"), ToNumberString(TimeWindow.EndMs.GetValue()));
 		}
 		OutResponse = FInsightCliResponse::Ok(MakeEnvelopeWithArray(Data, Meta));
 		return true;

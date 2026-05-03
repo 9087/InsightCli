@@ -17,10 +17,10 @@ bool HandleGpuCommands(const FInsightCliRequest& Request, const FTraceContext& C
 		}
 
 		int32 Limit = 100;
-		const bool bHasLimit = TryGetIntOption(Request.Args, TEXT("--limit"), Limit);
-		if (bHasLimit && Limit <= 0)
+		FInsightCliResponse LimitError;
+		if (!TryGetPositiveLimit(Request.Args, 100, Limit, LimitError))
 		{
-			OutResponse = FInsightCliResponse::Error(4, TEXT("E1003"), TEXT("limit must be > 0."));
+			OutResponse = LimitError;
 			return true;
 		}
 
@@ -77,17 +77,18 @@ bool HandleGpuCommands(const FInsightCliRequest& Request, const FTraceContext& C
 		}
 
 		FString PassName;
-		if (!TryGetStringOption(Request.Args, TEXT("--pass"), PassName))
+		FInsightCliResponse RequiredOptionError;
+		if (!RequireStringOption(Request.Args, TEXT("--pass"), TEXT("gpu pass-detail"), PassName, RequiredOptionError))
 		{
-			OutResponse = FInsightCliResponse::Error(4, TEXT("E1003"), TEXT("--pass is required for gpu pass-detail."));
+			OutResponse = RequiredOptionError;
 			return true;
 		}
 
 		int32 Limit = 100;
-		const bool bHasLimit = TryGetIntOption(Request.Args, TEXT("--limit"), Limit);
-		if (bHasLimit && Limit <= 0)
+		FInsightCliResponse LimitError;
+		if (!TryGetPositiveLimit(Request.Args, 100, Limit, LimitError))
 		{
-			OutResponse = FInsightCliResponse::Error(4, TEXT("E1003"), TEXT("limit must be > 0."));
+			OutResponse = LimitError;
 			return true;
 		}
 

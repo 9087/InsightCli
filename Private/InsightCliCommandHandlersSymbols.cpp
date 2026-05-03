@@ -17,9 +17,10 @@ bool HandleSymbolsCommands(const FInsightCliRequest& Request, const FTraceContex
 		}
 
 		FString ScopeName;
-		if (!TryGetStringOption(Request.Args, TEXT("--name"), ScopeName))
+		FInsightCliResponse RequiredOptionError;
+		if (!RequireStringOption(Request.Args, TEXT("--name"), TEXT("symbols resolve"), ScopeName, RequiredOptionError))
 		{
-			OutResponse = FInsightCliResponse::Error(4, TEXT("E1003"), TEXT("--name is required for symbols resolve."));
+			OutResponse = RequiredOptionError;
 			return true;
 		}
 

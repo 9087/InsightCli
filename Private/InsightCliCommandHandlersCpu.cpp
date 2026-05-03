@@ -17,10 +17,10 @@ bool HandleCpuCommands(const FInsightCliRequest& Request, const FTraceContext& C
 		}
 
 		int32 Limit = 100;
-		const bool bHasLimit = TryGetIntOption(Request.Args, TEXT("--limit"), Limit);
-		if (bHasLimit && Limit <= 0)
+		FInsightCliResponse LimitError;
+		if (!TryGetPositiveLimit(Request.Args, 100, Limit, LimitError))
 		{
-			OutResponse = FInsightCliResponse::Error(4, TEXT("E1003"), TEXT("limit must be > 0."));
+			OutResponse = LimitError;
 			return true;
 		}
 
@@ -121,10 +121,10 @@ bool HandleCpuCommands(const FInsightCliRequest& Request, const FTraceContext& C
 		}
 
 		int32 Limit = 100;
-		const bool bHasLimit = TryGetIntOption(Request.Args, TEXT("--limit"), Limit);
-		if (bHasLimit && Limit <= 0)
+		FInsightCliResponse LimitError;
+		if (!TryGetPositiveLimit(Request.Args, 100, Limit, LimitError))
 		{
-			OutResponse = FInsightCliResponse::Error(4, TEXT("E1003"), TEXT("limit must be > 0."));
+			OutResponse = LimitError;
 			return true;
 		}
 
@@ -193,7 +193,7 @@ bool HandleCpuCommands(const FInsightCliRequest& Request, const FTraceContext& C
 		{
 			Meta.Add(TEXT("thread"), ThreadFilter);
 		}
-		if (bHasLimit)
+		if (HasOption(Request.Args, TEXT("--limit")))
 		{
 			Meta.Add(TEXT("limit"), FString::FromInt(Limit));
 		}

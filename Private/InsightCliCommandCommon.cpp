@@ -421,6 +421,58 @@ bool TryGetLimitAndOptionalFrameIndexFilter(const TArray<FString>& Args, int32& 
 	return true;
 }
 
+bool TryGetTimeWindowMs(const TArray<FString>& Args, FTimeWindowMs& OutWindow, FInsightCliResponse& OutError)
+{
+	OutWindow.StartMs.Reset();
+	OutWindow.EndMs.Reset();
+
+	double StartMs = 0.0;
+	double EndMs = 0.0;
+	if (TryGetDoubleOption(Args, TEXT("--time-start"), StartMs))
+	{
+		OutWindow.StartMs = StartMs;
+	}
+	if (TryGetDoubleOption(Args, TEXT("--time-end"), EndMs))
+	{
+		OutWindow.EndMs = EndMs;
+	}
+
+	if (OutWindow.StartMs.IsSet() && OutWindow.EndMs.IsSet() && OutWindow.StartMs.GetValue() > OutWindow.EndMs.GetValue())
+	{
+		OutError = FInsightCliResponse::Error(4, TEXT("E1003"), TEXT("time-start must be <= time-end."));
+		return false;
+	}
+
+	return true;
+}
+
+bool TryGetPositiveLimit(const TArray<FString>& Args, int32 DefaultLimit, int32& OutLimit, FInsightCliResponse& OutError)
+{
+	OutLimit = DefaultLimit;
+	const bool bHasLimit = TryGetIntOption(Args, TEXT("--limit"), OutLimit);
+	if (bHasLimit && OutLimit <= 0)
+	{
+		OutError = FInsightCliResponse::Error(4, TEXT("E1003"), TEXT("limit must be > 0."));
+		return false;
+	}
+
+	return true;
+}
+
+bool RequireStringOption(const TArray<FString>& Args, const TCHAR* OptionName, const TCHAR* OwnerCommand, FString& OutValue, FInsightCliResponse& OutError)
+{
+	if (TryGetStringOption(Args, OptionName, OutValue))
+	{
+		return true;
+	}
+
+	OutError = FInsightCliResponse::Error(
+		4,
+		TEXT("E1003"),
+		FString::Printf(TEXT("%s is required for %s."), OptionName, OwnerCommand));
+	return false;
+}
+
 FString ToNumberString(double Value)
 {
 	return FString::Printf(TEXT("%.3f"), Value);

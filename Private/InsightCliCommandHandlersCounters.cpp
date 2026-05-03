@@ -61,9 +61,10 @@ bool HandleCountersCommands(const FInsightCliRequest& Request, const FTraceConte
 		}
 
 		FString CounterName;
-		if (!TryGetStringOption(Request.Args, TEXT("--name"), CounterName))
+		FInsightCliResponse RequiredOptionError;
+		if (!RequireStringOption(Request.Args, TEXT("--name"), TEXT("counters series"), CounterName, RequiredOptionError))
 		{
-			OutResponse = FInsightCliResponse::Error(4, TEXT("E1003"), TEXT("--name is required for counters series."));
+			OutResponse = RequiredOptionError;
 			return true;
 		}
 
@@ -105,13 +106,11 @@ bool HandleCountersCommands(const FInsightCliRequest& Request, const FTraceConte
 			return true;
 		}
 
-		double TimeStartMs = 0.0;
-		double TimeEndMs = 0.0;
-		const bool bHasTimeStart = TryGetDoubleOption(Request.Args, TEXT("--time-start"), TimeStartMs);
-		const bool bHasTimeEnd = TryGetDoubleOption(Request.Args, TEXT("--time-end"), TimeEndMs);
-		if (bHasTimeStart && bHasTimeEnd && TimeStartMs > TimeEndMs)
+		FTimeWindowMs TimeWindow;
+		FInsightCliResponse TimeWindowError;
+		if (!TryGetTimeWindowMs(Request.Args, TimeWindow, TimeWindowError))
 		{
-			OutResponse = FInsightCliResponse::Error(4, TEXT("E1003"), TEXT("time-start must be <= time-end."));
+			OutResponse = TimeWindowError;
 			return true;
 		}
 
@@ -128,8 +127,8 @@ bool HandleCountersCommands(const FInsightCliRequest& Request, const FTraceConte
 			CounterUnit,
 			FailureStage,
 			FailureReason,
-			bHasTimeStart ? TOptional<double>(TimeStartMs) : TOptional<double>(),
-			bHasTimeEnd ? TOptional<double>(TimeEndMs) : TOptional<double>()))
+			TimeWindow.StartMs,
+			TimeWindow.EndMs))
 		{
 			OutResponse = MakeTraceUnavailableError(
 				Context,
@@ -158,13 +157,13 @@ bool HandleCountersCommands(const FInsightCliRequest& Request, const FTraceConte
 		Meta.Add(TEXT("counter_type"), CounterType);
 		Meta.Add(TEXT("counter_unit"), CounterUnit);
 		Meta.Add(TEXT("data_source"), TEXT("trace"));
-		if (bHasTimeStart)
+		if (TimeWindow.StartMs.IsSet())
 		{
-			Meta.Add(TEXT("filter_time_start"), ToNumberString(TimeStartMs));
+			Meta.Add(TEXT("filter_time_start"), ToNumberString(TimeWindow.StartMs.GetValue()));
 		}
-		if (bHasTimeEnd)
+		if (TimeWindow.EndMs.IsSet())
 		{
-			Meta.Add(TEXT("filter_time_end"), ToNumberString(TimeEndMs));
+			Meta.Add(TEXT("filter_time_end"), ToNumberString(TimeWindow.EndMs.GetValue()));
 		}
 		OutResponse = FInsightCliResponse::Ok(MakeEnvelopeWithArray(Data, Meta));
 		return true;
@@ -180,9 +179,10 @@ bool HandleCountersCommands(const FInsightCliRequest& Request, const FTraceConte
 		}
 
 		FString CounterName;
-		if (!TryGetStringOption(Request.Args, TEXT("--name"), CounterName))
+		FInsightCliResponse RequiredOptionError;
+		if (!RequireStringOption(Request.Args, TEXT("--name"), TEXT("counters stats"), CounterName, RequiredOptionError))
 		{
-			OutResponse = FInsightCliResponse::Error(4, TEXT("E1003"), TEXT("--name is required for counters stats."));
+			OutResponse = RequiredOptionError;
 			return true;
 		}
 

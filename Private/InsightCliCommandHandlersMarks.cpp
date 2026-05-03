@@ -20,9 +20,10 @@ bool HandleMarksCommands(const FInsightCliRequest& Request, const FTraceContext&
 		}
 
 		FString Keyword;
-		if (!TryGetStringOption(Request.Args, TEXT("--keyword"), Keyword))
+		FInsightCliResponse RequiredOptionError;
+		if (!RequireStringOption(Request.Args, TEXT("--keyword"), TEXT("marks search"), Keyword, RequiredOptionError))
 		{
-			OutResponse = FInsightCliResponse::Error(4, TEXT("E1003"), TEXT("--keyword is required for marks search."));
+			OutResponse = RequiredOptionError;
 			return true;
 		}
 
@@ -43,13 +44,11 @@ bool HandleMarksCommands(const FInsightCliRequest& Request, const FTraceContext&
 			return true;
 		}
 
-		double TimeStartMs = 0.0;
-		double TimeEndMs = 0.0;
-		const bool bHasTimeStart = TryGetDoubleOption(Request.Args, TEXT("--time-start"), TimeStartMs);
-		const bool bHasTimeEnd = TryGetDoubleOption(Request.Args, TEXT("--time-end"), TimeEndMs);
-		if (bHasTimeStart && bHasTimeEnd && TimeStartMs > TimeEndMs)
+		FTimeWindowMs TimeWindow;
+		FInsightCliResponse TimeWindowError;
+		if (!TryGetTimeWindowMs(Request.Args, TimeWindow, TimeWindowError))
 		{
-			OutResponse = FInsightCliResponse::Error(4, TEXT("E1003"), TEXT("time-start must be <= time-end."));
+			OutResponse = TimeWindowError;
 			return true;
 		}
 
@@ -61,8 +60,8 @@ bool HandleMarksCommands(const FInsightCliRequest& Request, const FTraceContext&
 			AllMarks,
 			FailureStage,
 			FailureReason,
-			bHasTimeStart ? TOptional<double>(TimeStartMs) : TOptional<double>(),
-			bHasTimeEnd ? TOptional<double>(TimeEndMs) : TOptional<double>()))
+			TimeWindow.StartMs,
+			TimeWindow.EndMs))
 		{
 			OutResponse = MakeTraceUnavailableError(
 				Context,
@@ -93,12 +92,12 @@ bool HandleMarksCommands(const FInsightCliRequest& Request, const FTraceContext&
 				continue;
 			}
 
-			if (bHasTimeStart && Mark.TimestampMs < TimeStartMs)
+			if (TimeWindow.StartMs.IsSet() && Mark.TimestampMs < TimeWindow.StartMs.GetValue())
 			{
 				continue;
 			}
 
-			if (bHasTimeEnd && Mark.TimestampMs >= TimeEndMs)
+			if (TimeWindow.EndMs.IsSet() && Mark.TimestampMs >= TimeWindow.EndMs.GetValue())
 			{
 				continue;
 			}
@@ -136,13 +135,13 @@ bool HandleMarksCommands(const FInsightCliRequest& Request, const FTraceContext&
 		{
 			Meta.Add(TEXT("filter_thread_id"), FString::FromInt(ThreadIdFilter));
 		}
-		if (bHasTimeStart)
+		if (TimeWindow.StartMs.IsSet())
 		{
-			Meta.Add(TEXT("filter_time_start"), ToNumberString(TimeStartMs));
+			Meta.Add(TEXT("filter_time_start"), ToNumberString(TimeWindow.StartMs.GetValue()));
 		}
-		if (bHasTimeEnd)
+		if (TimeWindow.EndMs.IsSet())
 		{
-			Meta.Add(TEXT("filter_time_end"), ToNumberString(TimeEndMs));
+			Meta.Add(TEXT("filter_time_end"), ToNumberString(TimeWindow.EndMs.GetValue()));
 		}
 		Meta.Add(TEXT("data_source"), TEXT("trace"));
 
@@ -194,21 +193,19 @@ bool HandleMarksCommands(const FInsightCliRequest& Request, const FTraceContext&
 			return true;
 		}
 
-		double TimeStartMs = 0.0;
-		double TimeEndMs = 0.0;
-		const bool bHasTimeStart = TryGetDoubleOption(Request.Args, TEXT("--time-start"), TimeStartMs);
-		const bool bHasTimeEnd = TryGetDoubleOption(Request.Args, TEXT("--time-end"), TimeEndMs);
-		if (bHasTimeStart && bHasTimeEnd && TimeStartMs > TimeEndMs)
+		FTimeWindowMs TimeWindow;
+		FInsightCliResponse TimeWindowError;
+		if (!TryGetTimeWindowMs(Request.Args, TimeWindow, TimeWindowError))
 		{
-			OutResponse = FInsightCliResponse::Error(4, TEXT("E1003"), TEXT("time-start must be <= time-end."));
+			OutResponse = TimeWindowError;
 			return true;
 		}
 
 		const double Start = TimestampMs - WindowMs;
 		const double End = TimestampMs + WindowMs;
 
-		const TOptional<double> RequestStart = bHasTimeStart ? TOptional<double>(FMath::Max(Start, TimeStartMs)) : TOptional<double>(Start);
-		const TOptional<double> RequestEnd = bHasTimeEnd ? TOptional<double>(FMath::Min(End, TimeEndMs)) : TOptional<double>(End);
+		const TOptional<double> RequestStart = TimeWindow.StartMs.IsSet() ? TOptional<double>(FMath::Max(Start, TimeWindow.StartMs.GetValue())) : TOptional<double>(Start);
+		const TOptional<double> RequestEnd = TimeWindow.EndMs.IsSet() ? TOptional<double>(FMath::Min(End, TimeWindow.EndMs.GetValue())) : TOptional<double>(End);
 
 		TArray<FMarkSample> AllMarks;
 		FString FailureStage;
@@ -255,12 +252,12 @@ bool HandleMarksCommands(const FInsightCliRequest& Request, const FTraceContext&
 				continue;
 			}
 
-			if (bHasTimeStart && Mark.TimestampMs < TimeStartMs)
+			if (TimeWindow.StartMs.IsSet() && Mark.TimestampMs < TimeWindow.StartMs.GetValue())
 			{
 				continue;
 			}
 
-			if (bHasTimeEnd && Mark.TimestampMs >= TimeEndMs)
+			if (TimeWindow.EndMs.IsSet() && Mark.TimestampMs >= TimeWindow.EndMs.GetValue())
 			{
 				continue;
 			}
@@ -283,13 +280,13 @@ bool HandleMarksCommands(const FInsightCliRequest& Request, const FTraceContext&
 		{
 			Meta.Add(TEXT("filter_thread_id"), FString::FromInt(ThreadIdFilter));
 		}
-		if (bHasTimeStart)
-			{
-				Meta.Add(TEXT("filter_time_start"), ToNumberString(TimeStartMs));
-			}
-		if (bHasTimeEnd)
+		if (TimeWindow.StartMs.IsSet())
 		{
-			Meta.Add(TEXT("filter_time_end"), ToNumberString(TimeEndMs));
+			Meta.Add(TEXT("filter_time_start"), ToNumberString(TimeWindow.StartMs.GetValue()));
+		}
+		if (TimeWindow.EndMs.IsSet())
+		{
+			Meta.Add(TEXT("filter_time_end"), ToNumberString(TimeWindow.EndMs.GetValue()));
 		}
 		Meta.Add(TEXT("data_source"), TEXT("trace"));
 

@@ -153,6 +153,17 @@ struct FMarkSample
 	int32 ThreadId = 42;
 };
 
+struct FTimeWindowMs
+{
+	TOptional<double> StartMs;
+	TOptional<double> EndMs;
+
+	bool IsSet() const
+	{
+		return StartMs.IsSet() || EndMs.IsSet();
+	}
+};
+
 // Option parsing helpers
 bool TryGetIntOption(const TArray<FString>& Args, const TCHAR* LongName, int32& OutValue);
 bool TryGetDoubleOption(const TArray<FString>& Args, const TCHAR* LongName, double& OutValue);
@@ -160,6 +171,9 @@ bool TryGetStringOption(const TArray<FString>& Args, const TCHAR* LongName, FStr
 bool HasOption(const TArray<FString>& Args, const TCHAR* LongName);
 bool ValidateNoUnknownOptionsWithGlobals(const TArray<FString>& Args, const TArray<FString>& CommandOptionNames, FInsightCliResponse& OutError);
 bool TryGetLimitAndOptionalFrameIndexFilter(const TArray<FString>& Args, int32& OutLimit, int32& OutFrameIndexFilter, bool& bOutHasFrameIndex, FInsightCliResponse& OutError);
+bool TryGetTimeWindowMs(const TArray<FString>& Args, FTimeWindowMs& OutWindow, FInsightCliResponse& OutError);
+bool TryGetPositiveLimit(const TArray<FString>& Args, int32 DefaultLimit, int32& OutLimit, FInsightCliResponse& OutError);
+bool RequireStringOption(const TArray<FString>& Args, const TCHAR* OptionName, const TCHAR* OwnerCommand, FString& OutValue, FInsightCliResponse& OutError);
 FString ToNumberString(double Value);
 TMap<FString, FString> MakeNotFoundMeta(const FInsightCliRequest& Request, const FString& Reason, const FString& QueryKey = TEXT(""), const FString& QueryValue = TEXT(""));
 
