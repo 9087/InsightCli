@@ -59,8 +59,6 @@ struct FTraceContext
 	mutable double TraceDurationMs = 0.0;
 	mutable FString FrameSamplesFailureStage;
 	mutable FString FrameSamplesFailureReason;
-	mutable bool bHasCounterCatalog = false;
-	mutable TArray<FCounterCatalogEntry> CachedCounterCatalog;
 };
 
 struct FCpuScopeSample
