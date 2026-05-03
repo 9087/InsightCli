@@ -6,6 +6,13 @@
 #include "Dom/JsonObject.h"
 #include "Dom/JsonValue.h"
 #include "Misc/Optional.h"
+#include "Templates/SharedPointer.h"
+
+namespace TraceServices
+{
+class IAnalysisService;
+class IAnalysisSession;
+}
 
 namespace UE::InsightCli::Internal
 {
@@ -38,6 +45,11 @@ struct FTraceContext
 	FString FullPath;
 	int64 FileSize = 0;
 	FDateTime TimeStamp;
+	mutable TSharedPtr<TraceServices::IAnalysisService> CachedAnalysisService;
+	mutable TSharedPtr<const TraceServices::IAnalysisSession> CachedAnalysisSession;
+	mutable bool bAnalysisAttempted = false;
+	mutable FString AnalysisFailureStage;
+	mutable FString AnalysisFailureReason;
 	mutable bool bHasFrameSamples = false;
 	mutable TArray<FFrameSample> CachedFrameSamples;
 	mutable bool bFrameSamplesTraceBacked = false;
@@ -153,6 +165,11 @@ TMap<FString, FString> MakeNotFoundMeta(const FInsightCliRequest& Request, const
 
 // Trace/context bootstrap and shared frame data
 FInsightCliResponse ValidateTraceAndBuildContext(const FInsightCliRequest& Request, FTraceContext& OutContext);
+bool AcquireAnalysisSession(
+	const FTraceContext& Context,
+	TSharedPtr<const TraceServices::IAnalysisSession>& OutSession,
+	FString& OutFailureStage,
+	FString& OutFailureReason);
 TArray<FFrameSample> BuildFrameSamples(const FTraceContext& Context);
 bool EnsureTraceBackedFrameSamples(const FTraceContext& Context, FInsightCliResponse& OutError, const FString& ConsumerTag);
 void ApplyTimeWindowFilter(TArray<FFrameSample>& Frames, const TArray<FString>& Args, bool& bUsedWindow, FInsightCliResponse& OutError);

@@ -425,6 +425,80 @@ FInsightCliResponse ValidateTraceAndBuildContext(const FInsightCliRequest& Reque
 	return FInsightCliResponse();
 }
 
+bool AcquireAnalysisSession(
+	const FTraceContext& Context,
+	TSharedPtr<const TraceServices::IAnalysisSession>& OutSession,
+	FString& OutFailureStage,
+	FString& OutFailureReason)
+{
+	OutSession.Reset();
+	OutFailureStage.Reset();
+	OutFailureReason.Reset();
+
+	if (Context.CachedAnalysisSession.IsValid())
+	{
+		OutSession = Context.CachedAnalysisSession;
+		return true;
+	}
+
+	if (Context.bAnalysisAttempted)
+	{
+		OutFailureStage = Context.AnalysisFailureStage;
+		OutFailureReason = Context.AnalysisFailureReason;
+		return false;
+	}
+
+	Context.bAnalysisAttempted = true;
+	Context.AnalysisFailureStage.Reset();
+	Context.AnalysisFailureReason.Reset();
+
+	ITraceServicesModule* TraceServicesModule = FModuleManager::LoadModulePtr<ITraceServicesModule>(TEXT("TraceServices"));
+	if (TraceServicesModule == nullptr)
+	{
+		Context.AnalysisFailureStage = TEXT("module_load");
+		Context.AnalysisFailureReason = TEXT("TraceServices module not available");
+		OutFailureStage = Context.AnalysisFailureStage;
+		OutFailureReason = Context.AnalysisFailureReason;
+		return false;
+	}
+
+	if (!Context.CachedAnalysisService.IsValid())
+	{
+		Context.CachedAnalysisService = TraceServicesModule->GetAnalysisService();
+		if (!Context.CachedAnalysisService.IsValid())
+		{
+			Context.CachedAnalysisService = TraceServicesModule->CreateAnalysisService();
+		}
+	}
+
+	if (!Context.CachedAnalysisService.IsValid())
+	{
+		Context.AnalysisFailureStage = TEXT("analysis_service");
+		Context.AnalysisFailureReason = TEXT("analysis service unavailable");
+		OutFailureStage = Context.AnalysisFailureStage;
+		OutFailureReason = Context.AnalysisFailureReason;
+		return false;
+	}
+
+	uint32 StartAnalysisSehCode = 0;
+	const TSharedPtr<const TraceServices::IAnalysisSession> Session = StartAnalysisSafely(Context.CachedAnalysisService, Context.FullPath, StartAnalysisSehCode);
+	if (!Session.IsValid())
+	{
+		Context.AnalysisFailureStage = TEXT("start_analysis");
+		Context.AnalysisFailureReason = (StartAnalysisSehCode != 0)
+			? FString::Printf(TEXT("StartAnalysis raised SEH 0x%08X"), StartAnalysisSehCode)
+			: TEXT("StartAnalysis returned null session");
+		OutFailureStage = Context.AnalysisFailureStage;
+		OutFailureReason = Context.AnalysisFailureReason;
+		return false;
+	}
+
+	Session->Wait();
+	Context.CachedAnalysisSession = Session;
+	OutSession = Context.CachedAnalysisSession;
+	return true;
+}
+
 TArray<FFrameSample> BuildFrameSamples(const FTraceContext& Context)
 {
 	if (Context.bHasFrameSamples)
@@ -448,41 +522,17 @@ TArray<FFrameSample> BuildFrameSamples(const FTraceContext& Context)
 		return Context.CachedFrameSamples;
 	}
 
-	ITraceServicesModule* TraceServicesModule = FModuleManager::LoadModulePtr<ITraceServicesModule>(TEXT("TraceServices"));
-	if (TraceServicesModule == nullptr)
+	TSharedPtr<const TraceServices::IAnalysisSession> Session;
+	FString AnalysisFailureStage;
+	FString AnalysisFailureReason;
+	if (!AcquireAnalysisSession(Context, Session, AnalysisFailureStage, AnalysisFailureReason))
 	{
-		SetFrameSampleFailure(Context, TEXT("module_load"), TEXT("TraceServices module not available"));
+		SetFrameSampleFailure(
+			Context,
+			AnalysisFailureStage.IsEmpty() ? TEXT("analysis_session") : *AnalysisFailureStage,
+			AnalysisFailureReason.IsEmpty() ? TEXT("failed to acquire analysis session") : *AnalysisFailureReason);
 		return Context.CachedFrameSamples;
 	}
-
-	TSharedPtr<TraceServices::IAnalysisService> AnalysisService = TraceServicesModule->GetAnalysisService();
-	if (!AnalysisService.IsValid())
-	{
-		AnalysisService = TraceServicesModule->CreateAnalysisService();
-	}
-
-	if (!AnalysisService.IsValid())
-	{
-		SetFrameSampleFailure(Context, TEXT("analysis_service"), TEXT("analysis service unavailable"));
-		return Context.CachedFrameSamples;
-	}
-
-	uint32 StartAnalysisSehCode = 0;
-	const TSharedPtr<const TraceServices::IAnalysisSession> Session = StartAnalysisSafely(AnalysisService, Context.FullPath, StartAnalysisSehCode);
-	if (!Session.IsValid())
-	{
-		if (StartAnalysisSehCode != 0)
-		{
-			const FString SehReason = FString::Printf(TEXT("StartAnalysis raised SEH 0x%08X"), StartAnalysisSehCode);
-			SetFrameSampleFailure(Context, TEXT("start_analysis"), *SehReason);
-		}
-		else
-		{
-			SetFrameSampleFailure(Context, TEXT("start_analysis"), TEXT("StartAnalysis returned null session"));
-		}
-		return Context.CachedFrameSamples;
-	}
-	Session->Wait();
 
 	const auto SafeFrameIndex = [](const uint64 Index)
 	{
@@ -800,44 +850,11 @@ bool ResolveCpuThreadFilterToTraceId(const FTraceContext& Context, const FString
 		return false;
 	}
 
-	ITraceServicesModule* TraceServicesModule = FModuleManager::LoadModulePtr<ITraceServicesModule>(TEXT("TraceServices"));
-	if (TraceServicesModule == nullptr)
+	TSharedPtr<const TraceServices::IAnalysisSession> Session;
+	if (!AcquireAnalysisSession(Context, Session, OutFailureStage, OutFailureReason))
 	{
-		OutFailureStage = TEXT("module_load");
-		OutFailureReason = TEXT("TraceServices module not available");
 		return false;
 	}
-
-	TSharedPtr<TraceServices::IAnalysisService> AnalysisService = TraceServicesModule->GetAnalysisService();
-	if (!AnalysisService.IsValid())
-	{
-		AnalysisService = TraceServicesModule->CreateAnalysisService();
-	}
-
-	if (!AnalysisService.IsValid())
-	{
-		OutFailureStage = TEXT("analysis_service");
-		OutFailureReason = TEXT("analysis service unavailable");
-		return false;
-	}
-
-	uint32 StartAnalysisSehCode = 0;
-	const TSharedPtr<const TraceServices::IAnalysisSession> Session = StartAnalysisSafely(AnalysisService, Context.FullPath, StartAnalysisSehCode);
-	if (!Session.IsValid())
-	{
-		OutFailureStage = TEXT("start_analysis");
-		if (StartAnalysisSehCode != 0)
-		{
-			OutFailureReason = FString::Printf(TEXT("StartAnalysis raised SEH 0x%08X"), StartAnalysisSehCode);
-		}
-		else
-		{
-			OutFailureReason = TEXT("StartAnalysis returned null session");
-		}
-		return false;
-	}
-
-	Session->Wait();
 
 	bool bFoundThread = false;
 	{
@@ -890,44 +907,11 @@ bool BuildCpuTopSamples(const FTraceContext& Context, const TOptional<uint32>& C
 		return false;
 	}
 
-	ITraceServicesModule* TraceServicesModule = FModuleManager::LoadModulePtr<ITraceServicesModule>(TEXT("TraceServices"));
-	if (TraceServicesModule == nullptr)
+	TSharedPtr<const TraceServices::IAnalysisSession> Session;
+	if (!AcquireAnalysisSession(Context, Session, OutFailureStage, OutFailureReason))
 	{
-		OutFailureStage = TEXT("module_load");
-		OutFailureReason = TEXT("TraceServices module not available");
 		return false;
 	}
-
-	TSharedPtr<TraceServices::IAnalysisService> AnalysisService = TraceServicesModule->GetAnalysisService();
-	if (!AnalysisService.IsValid())
-	{
-		AnalysisService = TraceServicesModule->CreateAnalysisService();
-	}
-
-	if (!AnalysisService.IsValid())
-	{
-		OutFailureStage = TEXT("analysis_service");
-		OutFailureReason = TEXT("analysis service unavailable");
-		return false;
-	}
-
-	uint32 StartAnalysisSehCode = 0;
-	const TSharedPtr<const TraceServices::IAnalysisSession> Session = StartAnalysisSafely(AnalysisService, Context.FullPath, StartAnalysisSehCode);
-	if (!Session.IsValid())
-	{
-		OutFailureStage = TEXT("start_analysis");
-		if (StartAnalysisSehCode != 0)
-		{
-			OutFailureReason = FString::Printf(TEXT("StartAnalysis raised SEH 0x%08X"), StartAnalysisSehCode);
-		}
-		else
-		{
-			OutFailureReason = TEXT("StartAnalysis returned null session");
-		}
-		return false;
-	}
-
-	Session->Wait();
 
 	TUniquePtr<TraceServices::ITable<TraceServices::FTimingProfilerAggregatedStats>> StatsTable;
 	{
@@ -1060,39 +1044,11 @@ bool BuildCpuStackObject(
 
 	bOutFound = true;
 
-	ITraceServicesModule* TraceServicesModule = FModuleManager::LoadModulePtr<ITraceServicesModule>(TEXT("TraceServices"));
-	if (TraceServicesModule == nullptr)
+	TSharedPtr<const TraceServices::IAnalysisSession> Session;
+	if (!AcquireAnalysisSession(Context, Session, OutFailureStage, OutFailureReason))
 	{
-		OutFailureStage = TEXT("module_load");
-		OutFailureReason = TEXT("TraceServices module not available");
 		return false;
 	}
-
-	TSharedPtr<TraceServices::IAnalysisService> AnalysisService = TraceServicesModule->GetAnalysisService();
-	if (!AnalysisService.IsValid())
-	{
-		AnalysisService = TraceServicesModule->CreateAnalysisService();
-	}
-
-	if (!AnalysisService.IsValid())
-	{
-		OutFailureStage = TEXT("analysis_service");
-		OutFailureReason = TEXT("analysis service unavailable");
-		return false;
-	}
-
-	uint32 StartAnalysisSehCode = 0;
-	const TSharedPtr<const TraceServices::IAnalysisSession> Session = StartAnalysisSafely(AnalysisService, Context.FullPath, StartAnalysisSehCode);
-	if (!Session.IsValid())
-	{
-		OutFailureStage = TEXT("start_analysis");
-		OutFailureReason = (StartAnalysisSehCode != 0)
-			? FString::Printf(TEXT("StartAnalysis raised SEH 0x%08X"), StartAnalysisSehCode)
-			: TEXT("StartAnalysis returned null session");
-		return false;
-	}
-
-	Session->Wait();
 
 	struct FTimerSnapshot
 	{
@@ -1419,44 +1375,11 @@ bool BuildGpuTopSamples(
 	OutFailureStage.Reset();
 	OutFailureReason.Reset();
 
-	ITraceServicesModule* TraceServicesModule = FModuleManager::LoadModulePtr<ITraceServicesModule>(TEXT("TraceServices"));
-	if (TraceServicesModule == nullptr)
+	TSharedPtr<const TraceServices::IAnalysisSession> Session;
+	if (!AcquireAnalysisSession(Context, Session, OutFailureStage, OutFailureReason))
 	{
-		OutFailureStage = TEXT("module_load");
-		OutFailureReason = TEXT("TraceServices module not available");
 		return false;
 	}
-
-	TSharedPtr<TraceServices::IAnalysisService> AnalysisService = TraceServicesModule->GetAnalysisService();
-	if (!AnalysisService.IsValid())
-	{
-		AnalysisService = TraceServicesModule->CreateAnalysisService();
-	}
-
-	if (!AnalysisService.IsValid())
-	{
-		OutFailureStage = TEXT("analysis_service");
-		OutFailureReason = TEXT("analysis service unavailable");
-		return false;
-	}
-
-	uint32 StartAnalysisSehCode = 0;
-	const TSharedPtr<const TraceServices::IAnalysisSession> Session = StartAnalysisSafely(AnalysisService, Context.FullPath, StartAnalysisSehCode);
-	if (!Session.IsValid())
-	{
-		OutFailureStage = TEXT("start_analysis");
-		if (StartAnalysisSehCode != 0)
-		{
-			OutFailureReason = FString::Printf(TEXT("StartAnalysis raised SEH 0x%08X"), StartAnalysisSehCode);
-		}
-		else
-		{
-			OutFailureReason = TEXT("StartAnalysis returned null session");
-		}
-		return false;
-	}
-
-	Session->Wait();
 
 	TUniquePtr<TraceServices::ITable<TraceServices::FTimingProfilerAggregatedStats>> StatsTable;
 	{
@@ -1598,39 +1521,11 @@ bool BuildThreadWaitSamplesTrace(
 		Frames = BuildFrameSamples(Context);
 	}
 
-	ITraceServicesModule* TraceServicesModule = FModuleManager::LoadModulePtr<ITraceServicesModule>(TEXT("TraceServices"));
-	if (TraceServicesModule == nullptr)
+	TSharedPtr<const TraceServices::IAnalysisSession> Session;
+	if (!AcquireAnalysisSession(Context, Session, OutFailureStage, OutFailureReason))
 	{
-		OutFailureStage = TEXT("module_load");
-		OutFailureReason = TEXT("TraceServices module not available");
 		return false;
 	}
-
-	TSharedPtr<TraceServices::IAnalysisService> AnalysisService = TraceServicesModule->GetAnalysisService();
-	if (!AnalysisService.IsValid())
-	{
-		AnalysisService = TraceServicesModule->CreateAnalysisService();
-	}
-
-	if (!AnalysisService.IsValid())
-	{
-		OutFailureStage = TEXT("analysis_service");
-		OutFailureReason = TEXT("analysis service unavailable");
-		return false;
-	}
-
-	uint32 StartAnalysisSehCode = 0;
-	const TSharedPtr<const TraceServices::IAnalysisSession> Session = StartAnalysisSafely(AnalysisService, Context.FullPath, StartAnalysisSehCode);
-	if (!Session.IsValid())
-	{
-		OutFailureStage = TEXT("start_analysis");
-		OutFailureReason = (StartAnalysisSehCode != 0)
-			? FString::Printf(TEXT("StartAnalysis raised SEH 0x%08X"), StartAnalysisSehCode)
-			: TEXT("StartAnalysis returned null session");
-		return false;
-	}
-
-	Session->Wait();
 
 	const auto GetFrameIndexForTimestampMs = [&Frames](const double TimestampMs) -> int32
 	{
@@ -1790,39 +1685,11 @@ bool BuildTaskTopSamples(
 		IntervalEndSec = FMath::Max(IntervalStartSec.GetValue() + KINDA_SMALL_NUMBER, FoundFrame->FrameEndMs / 1000.0);
 	}
 
-	ITraceServicesModule* TraceServicesModule = FModuleManager::LoadModulePtr<ITraceServicesModule>(TEXT("TraceServices"));
-	if (TraceServicesModule == nullptr)
+	TSharedPtr<const TraceServices::IAnalysisSession> Session;
+	if (!AcquireAnalysisSession(Context, Session, OutFailureStage, OutFailureReason))
 	{
-		OutFailureStage = TEXT("module_load");
-		OutFailureReason = TEXT("TraceServices module not available");
 		return false;
 	}
-
-	TSharedPtr<TraceServices::IAnalysisService> AnalysisService = TraceServicesModule->GetAnalysisService();
-	if (!AnalysisService.IsValid())
-	{
-		AnalysisService = TraceServicesModule->CreateAnalysisService();
-	}
-
-	if (!AnalysisService.IsValid())
-	{
-		OutFailureStage = TEXT("analysis_service");
-		OutFailureReason = TEXT("analysis service unavailable");
-		return false;
-	}
-
-	uint32 StartAnalysisSehCode = 0;
-	const TSharedPtr<const TraceServices::IAnalysisSession> Session = StartAnalysisSafely(AnalysisService, Context.FullPath, StartAnalysisSehCode);
-	if (!Session.IsValid())
-	{
-		OutFailureStage = TEXT("start_analysis");
-		OutFailureReason = (StartAnalysisSehCode != 0)
-			? FString::Printf(TEXT("StartAnalysis raised SEH 0x%08X"), StartAnalysisSehCode)
-			: TEXT("StartAnalysis returned null session");
-		return false;
-	}
-
-	Session->Wait();
 
 	const auto GetFrameIndexForTimestampMs = [&Frames](const double TimestampMs) -> int32
 	{
@@ -1968,44 +1835,11 @@ bool BuildSymbolsResolveObject(
 	OutFailureStage.Reset();
 	OutFailureReason.Reset();
 
-	ITraceServicesModule* TraceServicesModule = FModuleManager::LoadModulePtr<ITraceServicesModule>(TEXT("TraceServices"));
-	if (TraceServicesModule == nullptr)
+	TSharedPtr<const TraceServices::IAnalysisSession> Session;
+	if (!AcquireAnalysisSession(Context, Session, OutFailureStage, OutFailureReason))
 	{
-		OutFailureStage = TEXT("module_load");
-		OutFailureReason = TEXT("TraceServices module not available");
 		return false;
 	}
-
-	TSharedPtr<TraceServices::IAnalysisService> AnalysisService = TraceServicesModule->GetAnalysisService();
-	if (!AnalysisService.IsValid())
-	{
-		AnalysisService = TraceServicesModule->CreateAnalysisService();
-	}
-
-	if (!AnalysisService.IsValid())
-	{
-		OutFailureStage = TEXT("analysis_service");
-		OutFailureReason = TEXT("analysis service unavailable");
-		return false;
-	}
-
-	uint32 StartAnalysisSehCode = 0;
-	const TSharedPtr<const TraceServices::IAnalysisSession> Session = StartAnalysisSafely(AnalysisService, Context.FullPath, StartAnalysisSehCode);
-	if (!Session.IsValid())
-	{
-		OutFailureStage = TEXT("start_analysis");
-		if (StartAnalysisSehCode != 0)
-		{
-			OutFailureReason = FString::Printf(TEXT("StartAnalysis raised SEH 0x%08X"), StartAnalysisSehCode);
-		}
-		else
-		{
-			OutFailureReason = TEXT("StartAnalysis returned null session");
-		}
-		return false;
-	}
-
-	Session->Wait();
 
 	struct FSymbolCandidate
 	{
@@ -2190,39 +2024,11 @@ bool BuildCounterCatalog(
 	OutFailureStage.Reset();
 	OutFailureReason.Reset();
 
-	ITraceServicesModule* TraceServicesModule = FModuleManager::LoadModulePtr<ITraceServicesModule>(TEXT("TraceServices"));
-	if (TraceServicesModule == nullptr)
+	TSharedPtr<const TraceServices::IAnalysisSession> Session;
+	if (!AcquireAnalysisSession(Context, Session, OutFailureStage, OutFailureReason))
 	{
-		OutFailureStage = TEXT("module_load");
-		OutFailureReason = TEXT("TraceServices module not available");
 		return false;
 	}
-
-	TSharedPtr<TraceServices::IAnalysisService> AnalysisService = TraceServicesModule->GetAnalysisService();
-	if (!AnalysisService.IsValid())
-	{
-		AnalysisService = TraceServicesModule->CreateAnalysisService();
-	}
-
-	if (!AnalysisService.IsValid())
-	{
-		OutFailureStage = TEXT("analysis_service");
-		OutFailureReason = TEXT("analysis service unavailable");
-		return false;
-	}
-
-	uint32 StartAnalysisSehCode = 0;
-	const TSharedPtr<const TraceServices::IAnalysisSession> Session = StartAnalysisSafely(AnalysisService, Context.FullPath, StartAnalysisSehCode);
-	if (!Session.IsValid())
-	{
-		OutFailureStage = TEXT("start_analysis");
-		OutFailureReason = (StartAnalysisSehCode != 0)
-			? FString::Printf(TEXT("StartAnalysis raised SEH 0x%08X"), StartAnalysisSehCode)
-			: TEXT("StartAnalysis returned null session");
-		return false;
-	}
-
-	Session->Wait();
 
 	const auto InferUnit = [](const FString& Name, TraceServices::ECounterDisplayHint DisplayHint) -> FString
 	{
@@ -2298,39 +2104,11 @@ bool BuildCounterSeries(
 	OutFailureStage.Reset();
 	OutFailureReason.Reset();
 
-	ITraceServicesModule* TraceServicesModule = FModuleManager::LoadModulePtr<ITraceServicesModule>(TEXT("TraceServices"));
-	if (TraceServicesModule == nullptr)
+	TSharedPtr<const TraceServices::IAnalysisSession> Session;
+	if (!AcquireAnalysisSession(Context, Session, OutFailureStage, OutFailureReason))
 	{
-		OutFailureStage = TEXT("module_load");
-		OutFailureReason = TEXT("TraceServices module not available");
 		return false;
 	}
-
-	TSharedPtr<TraceServices::IAnalysisService> AnalysisService = TraceServicesModule->GetAnalysisService();
-	if (!AnalysisService.IsValid())
-	{
-		AnalysisService = TraceServicesModule->CreateAnalysisService();
-	}
-
-	if (!AnalysisService.IsValid())
-	{
-		OutFailureStage = TEXT("analysis_service");
-		OutFailureReason = TEXT("analysis service unavailable");
-		return false;
-	}
-
-	uint32 StartAnalysisSehCode = 0;
-	const TSharedPtr<const TraceServices::IAnalysisSession> Session = StartAnalysisSafely(AnalysisService, Context.FullPath, StartAnalysisSehCode);
-	if (!Session.IsValid())
-	{
-		OutFailureStage = TEXT("start_analysis");
-		OutFailureReason = (StartAnalysisSehCode != 0)
-			? FString::Printf(TEXT("StartAnalysis raised SEH 0x%08X"), StartAnalysisSehCode)
-			: TEXT("StartAnalysis returned null session");
-		return false;
-	}
-
-	Session->Wait();
 
 	const auto InferUnit = [](const FString& Name, TraceServices::ECounterDisplayHint DisplayHint) -> FString
 	{
@@ -2449,39 +2227,11 @@ bool BuildMemorySamplesTrace(
 	OutFailureStage.Reset();
 	OutFailureReason.Reset();
 
-	ITraceServicesModule* TraceServicesModule = FModuleManager::LoadModulePtr<ITraceServicesModule>(TEXT("TraceServices"));
-	if (TraceServicesModule == nullptr)
+	TSharedPtr<const TraceServices::IAnalysisSession> Session;
+	if (!AcquireAnalysisSession(Context, Session, OutFailureStage, OutFailureReason))
 	{
-		OutFailureStage = TEXT("module_load");
-		OutFailureReason = TEXT("TraceServices module not available");
 		return false;
 	}
-
-	TSharedPtr<TraceServices::IAnalysisService> AnalysisService = TraceServicesModule->GetAnalysisService();
-	if (!AnalysisService.IsValid())
-	{
-		AnalysisService = TraceServicesModule->CreateAnalysisService();
-	}
-
-	if (!AnalysisService.IsValid())
-	{
-		OutFailureStage = TEXT("analysis_service");
-		OutFailureReason = TEXT("analysis service unavailable");
-		return false;
-	}
-
-	uint32 StartAnalysisSehCode = 0;
-	const TSharedPtr<const TraceServices::IAnalysisSession> Session = StartAnalysisSafely(AnalysisService, Context.FullPath, StartAnalysisSehCode);
-	if (!Session.IsValid())
-	{
-		OutFailureStage = TEXT("start_analysis");
-		OutFailureReason = (StartAnalysisSehCode != 0)
-			? FString::Printf(TEXT("StartAnalysis raised SEH 0x%08X"), StartAnalysisSehCode)
-			: TEXT("StartAnalysis returned null session");
-		return false;
-	}
-
-	Session->Wait();
 	const TArray<FFrameSample> Frames = BuildFrameSamples(Context);
 	const auto GetFrameIndexForTimestampMs = [&Frames](const double TimestampMs) -> int32
 	{
@@ -2626,39 +2376,11 @@ bool BuildMemoryTagsTrace(
 	OutFailureStage.Reset();
 	OutFailureReason.Reset();
 
-	ITraceServicesModule* TraceServicesModule = FModuleManager::LoadModulePtr<ITraceServicesModule>(TEXT("TraceServices"));
-	if (TraceServicesModule == nullptr)
+	TSharedPtr<const TraceServices::IAnalysisSession> Session;
+	if (!AcquireAnalysisSession(Context, Session, OutFailureStage, OutFailureReason))
 	{
-		OutFailureStage = TEXT("module_load");
-		OutFailureReason = TEXT("TraceServices module not available");
 		return false;
 	}
-
-	TSharedPtr<TraceServices::IAnalysisService> AnalysisService = TraceServicesModule->GetAnalysisService();
-	if (!AnalysisService.IsValid())
-	{
-		AnalysisService = TraceServicesModule->CreateAnalysisService();
-	}
-
-	if (!AnalysisService.IsValid())
-	{
-		OutFailureStage = TEXT("analysis_service");
-		OutFailureReason = TEXT("analysis service unavailable");
-		return false;
-	}
-
-	uint32 StartAnalysisSehCode = 0;
-	const TSharedPtr<const TraceServices::IAnalysisSession> Session = StartAnalysisSafely(AnalysisService, Context.FullPath, StartAnalysisSehCode);
-	if (!Session.IsValid())
-	{
-		OutFailureStage = TEXT("start_analysis");
-		OutFailureReason = (StartAnalysisSehCode != 0)
-			? FString::Printf(TEXT("StartAnalysis raised SEH 0x%08X"), StartAnalysisSehCode)
-			: TEXT("StartAnalysis returned null session");
-		return false;
-	}
-
-	Session->Wait();
 	TMap<FString, int64> TagBytes;
 
 	{
@@ -2766,39 +2488,11 @@ bool BuildMarks(
 	OutFailureStage.Reset();
 	OutFailureReason.Reset();
 
-	ITraceServicesModule* TraceServicesModule = FModuleManager::LoadModulePtr<ITraceServicesModule>(TEXT("TraceServices"));
-	if (TraceServicesModule == nullptr)
+	TSharedPtr<const TraceServices::IAnalysisSession> Session;
+	if (!AcquireAnalysisSession(Context, Session, OutFailureStage, OutFailureReason))
 	{
-		OutFailureStage = TEXT("module_load");
-		OutFailureReason = TEXT("TraceServices module not available");
 		return false;
 	}
-
-	TSharedPtr<TraceServices::IAnalysisService> AnalysisService = TraceServicesModule->GetAnalysisService();
-	if (!AnalysisService.IsValid())
-	{
-		AnalysisService = TraceServicesModule->CreateAnalysisService();
-	}
-
-	if (!AnalysisService.IsValid())
-	{
-		OutFailureStage = TEXT("analysis_service");
-		OutFailureReason = TEXT("analysis service unavailable");
-		return false;
-	}
-
-	uint32 StartAnalysisSehCode = 0;
-	const TSharedPtr<const TraceServices::IAnalysisSession> Session = StartAnalysisSafely(AnalysisService, Context.FullPath, StartAnalysisSehCode);
-	if (!Session.IsValid())
-	{
-		OutFailureStage = TEXT("start_analysis");
-		OutFailureReason = (StartAnalysisSehCode != 0)
-			? FString::Printf(TEXT("StartAnalysis raised SEH 0x%08X"), StartAnalysisSehCode)
-			: TEXT("StartAnalysis returned null session");
-		return false;
-	}
-
-	Session->Wait();
 
 	double DurationSec = 0.0;
 	{
