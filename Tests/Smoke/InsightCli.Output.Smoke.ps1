@@ -723,6 +723,53 @@ function Invoke-NormalTraceSmoke {
                 throw 'Expected niagara emitter-cost fallback warning metadata'
             }
         }),
+        (New-SmokeCase -Message "[$([IO.Path]::GetFileName($TracePath))] Verify physics summary returns stage totals..." -Context 'physics summary' -Args @($TracePath, 'physics', 'summary', '--frame-index', '1') -MustContain @('"data"') -Validate {
+            param($result)
+            $json = Parse-JsonOutput -Text $result.Text -Context 'physics summary'
+            if ($null -eq $json.data) {
+                throw 'Expected physics summary response to include data object'
+            }
+            foreach ($field in @('scope_sample_count', 'total_physics_ms', 'broadphase_ms', 'narrowphase_ms', 'constraint_ms', 'solver_ms')) {
+                if ($null -eq $json.data.$field) {
+                    throw "Expected physics summary field: $field"
+                }
+            }
+            if ($json.meta.data_source -ne 'cpu_scope_pattern') {
+                throw 'Expected physics summary meta.data_source=cpu_scope_pattern'
+            }
+            if ([string]::IsNullOrWhiteSpace([string]$json.meta.warning)) {
+                throw 'Expected physics summary fallback warning metadata'
+            }
+        }),
+        (New-SmokeCase -Message "[$([IO.Path]::GetFileName($TracePath))] Verify physics solver-stages returns stage rows..." -Context 'physics solver-stages' -Args @($TracePath, 'physics', 'solver-stages') -MustContain @('"data"') -Validate {
+            param($result)
+            $json = Parse-JsonOutput -Text $result.Text -Context 'physics solver-stages'
+            if ($null -eq $json.data) {
+                throw 'Expected physics solver-stages response to include data array'
+            }
+            if ($json.meta.data_source -ne 'cpu_scope_pattern') {
+                throw 'Expected physics solver-stages meta.data_source=cpu_scope_pattern'
+            }
+            if ([string]::IsNullOrWhiteSpace([string]$json.meta.warning)) {
+                throw 'Expected physics solver-stages fallback warning metadata'
+            }
+        }),
+        (New-SmokeCase -Message "[$([IO.Path]::GetFileName($TracePath))] Verify physics top-bodies supports limit..." -Context 'physics top-bodies' -Args @($TracePath, 'physics', 'top-bodies', '--limit', '3') -MustContain @('"data"') -Validate {
+            param($result)
+            $json = Parse-JsonOutput -Text $result.Text -Context 'physics top-bodies'
+            if ($null -eq $json.data) {
+                throw 'Expected physics top-bodies response to include data array'
+            }
+            if ($json.data.Count -gt 3) {
+                throw 'Expected physics top-bodies count <= limit'
+            }
+            if ($json.meta.data_source -ne 'cpu_scope_pattern') {
+                throw 'Expected physics top-bodies meta.data_source=cpu_scope_pattern'
+            }
+            if ([string]::IsNullOrWhiteSpace([string]$json.meta.warning)) {
+                throw 'Expected physics top-bodies fallback warning metadata'
+            }
+        }),
         (New-SmokeCase -Message "[$([IO.Path]::GetFileName($TracePath))] Verify threads waits returns trace-backed wait diagnostics..." -Context 'threads waits' -Args @($TracePath, 'threads', 'waits', '--frame-index', '1', '--limit', '3') -MustContain @('"data"', '"data_source"') -Validate {
             param($result)
             $json = Parse-JsonOutput -Text $result.Text -Context 'threads waits'

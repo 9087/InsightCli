@@ -16,6 +16,7 @@ InsightCli 是一个命令行工具，用于读取 Unreal trace 文件（`.utrac
 - `gpu`
 - `anim`
 - `niagara`
+- `physics`
 - `slate`
 - `threads`
 - `tasks`
@@ -696,6 +697,30 @@ InsightCli.exe C:/traces/run01.utrace rhi drawcalls --limit 5
 
 说明：
 - 当 Niagara channel 数据不可用时，这些命令会回退到 CPU scope 名称模式近似，并在 `meta.warning` 标注。
+
+## 5.8.21 `physics summary`
+
+用途：
+- 返回物理阶段汇总近似值，包括 broadphase/narrowphase/constraint/solver 聚合耗时。
+
+参数：
+- `--frame-index <n>`：可选帧索引（用于校验帧存在性）。
+
+## 5.8.22 `physics solver-stages`
+
+用途：
+- 返回从物理相关 scope 模式聚合得到的 solver stage 列表。
+
+## 5.8.23 `physics top-bodies`
+
+用途：
+- 返回按物理相关 scope 开销聚合的 body 热点。
+
+参数：
+- `--limit <n>`：返回记录数量上限。
+
+说明：
+- 当 Physics channel 数据不可用时，这些命令会回退到 CPU scope 名称模式近似，并在 `meta.warning` 标注。
 
 ## 5.9 `threads waits`
 

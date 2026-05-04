@@ -16,6 +16,7 @@ Supported command groups:
 - `gpu`
 - `anim`
 - `niagara`
+- `physics`
 - `slate`
 - `threads`
 - `tasks`
@@ -698,6 +699,30 @@ Options:
 
 Notes:
 - When Niagara channel data is unavailable, these commands fall back to CPU scope name pattern approximation and emit `meta.warning`.
+
+## 5.8.21 `physics summary`
+
+Purpose:
+- Return physics stage summary approximation, including broadphase/narrowphase/constraint/solver totals.
+
+Options:
+- `--frame-index <n>`: Optional frame selector (for trace frame existence validation).
+
+## 5.8.22 `physics solver-stages`
+
+Purpose:
+- Return aggregated solver-stage rows from physics-related scope patterns.
+
+## 5.8.23 `physics top-bodies`
+
+Purpose:
+- Return top body-like buckets by physics-related scope cost.
+
+Options:
+- `--limit <n>`: Maximum row count.
+
+Notes:
+- When Physics channel data is unavailable, these commands fall back to CPU scope name pattern approximation and emit `meta.warning`.
 
 ## 5.9 `threads waits`
 

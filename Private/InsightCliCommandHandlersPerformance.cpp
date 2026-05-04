@@ -8,13 +8,14 @@ namespace
 {
 using FHandlerFn = bool (*)(const FInsightCliRequest&, const FTraceContext&, FInsightCliResponse&);
 
-constexpr int32 ExpectedPerformanceHandlerCount = 7;
+constexpr int32 ExpectedPerformanceHandlerCount = 8;
 constexpr FHandlerFn PerformanceHandlers[] =
 {
 	&HandleCpuCommands,
 	&HandleGpuCommands,
 	&HandleAnimCommands,
 	&HandleNiagaraCommands,
+	&HandlePhysicsCommands,
 	&HandleSlateCommands,
 	&HandleThreadsCommands,
 	&HandleTasksCommands,
