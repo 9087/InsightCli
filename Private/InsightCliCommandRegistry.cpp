@@ -32,6 +32,7 @@ constexpr FCommandCatalogEntry CommandCatalog[] =
 	{ TEXT("threads"), TEXT("waits"), &HandlePerformanceCommands },
 	{ TEXT("threads"), TEXT("wait-chain"), &HandlePerformanceCommands },
 	{ TEXT("tasks"), TEXT("top"), &HandlePerformanceCommands },
+	{ TEXT("tasks"), TEXT("critical-path"), &HandlePerformanceCommands },
 	{ TEXT("symbols"), TEXT("resolve"), &HandleDataCommands },
 	{ TEXT("counters"), TEXT("list"), &HandleDataCommands },
 	{ TEXT("counters"), TEXT("series"), &HandleDataCommands },

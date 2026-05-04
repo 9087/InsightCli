@@ -389,6 +389,50 @@ function Invoke-NormalTraceSmoke {
                 Assert-Descending -Items $json.data -Property 'queue_wait_ms' -Context 'tasks top'
             }
         }),
+        (New-SmokeCase -Message "[$([IO.Path]::GetFileName($TracePath))] Verify tasks critical-path returns path diagnostics..." -Context 'tasks critical-path' -Args @($TracePath, 'tasks', 'critical-path', '--frame-index', '1', '--top', '2') -MustContain @('"data"', '"data_source"') -Validate {
+            param($result)
+            $json = Parse-JsonOutput -Text $result.Text -Context 'tasks critical-path'
+            if ($null -eq $json.data) {
+                throw 'Expected tasks critical-path response to include data array'
+            }
+            if ($json.meta.data_source -ne 'trace') {
+                throw 'Expected tasks critical-path meta.data_source=trace'
+            }
+            if ($json.meta.frame_index -ne '1') {
+                throw 'Expected tasks critical-path meta.frame_index=1'
+            }
+            if ($json.data.Count -gt 2) {
+                throw 'Expected tasks critical-path count <= top'
+            }
+
+            if ($json.data.Count -gt 0) {
+                foreach ($item in $json.data) {
+                    if ($null -eq $item.path -or $item.path.Count -lt 1) {
+                        throw 'Expected non-empty path array in tasks critical-path rows'
+                    }
+                    if ($null -eq $item.total_duration_ms -or $null -eq $item.node_count) {
+                        throw 'Expected total_duration_ms and node_count in tasks critical-path rows'
+                    }
+
+                    foreach ($node in $item.path) {
+                        if ($null -eq $node.task_name -or [string]::IsNullOrWhiteSpace([string]$node.task_name)) {
+                            throw 'Expected task_name in tasks critical-path nodes'
+                        }
+                        if ($null -eq $node.thread -or [string]::IsNullOrWhiteSpace([string]$node.thread)) {
+                            throw 'Expected thread in tasks critical-path nodes'
+                        }
+                        if ($null -eq $node.start_ms -or $null -eq $node.duration_ms) {
+                            throw 'Expected start_ms and duration_ms in tasks critical-path nodes'
+                        }
+                        if ($null -eq $node.waits_for) {
+                            throw 'Expected waits_for array in tasks critical-path nodes'
+                        }
+                    }
+                }
+
+                Assert-Descending -Items $json.data -Property 'total_duration_ms' -Context 'tasks critical-path'
+            }
+        }),
         (New-SmokeCase -Message "[$([IO.Path]::GetFileName($TracePath))] Verify loadtime summary returns aggregate metrics..." -Context 'loadtime summary' -Args @($TracePath, 'loadtime', 'summary') -MustContain @('"data"', '"package_count"', '"total_load_ms"') -Validate {
             param($result)
             $json = Parse-JsonOutput -Text $result.Text -Context 'loadtime summary'

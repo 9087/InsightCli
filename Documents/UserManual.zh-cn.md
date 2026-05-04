@@ -534,6 +534,68 @@ InsightCli.exe C:/traces/run01.utrace tasks top --frame-index 120 --limit 5
 }
 ```
 
+## 5.10.1 `tasks critical-path`
+
+用途：
+- 输出单帧内按加权最长路径计算得到的任务关键路径。
+
+参数：
+- `--frame-index <n>`（必填）：目标帧索引。
+- `--top <k>`：返回关键路径数量，默认 `3`。
+
+示例：
+
+```powershell
+InsightCli.exe C:/traces/run01.utrace tasks critical-path --frame-index 120 --top 3
+```
+
+示例输出：
+
+```json
+{
+  "data": [
+    {
+      "path_rank": 1,
+      "frame_index": 120,
+      "total_duration_ms": 5.7,
+      "node_count": 3,
+      "partial": false,
+      "path": [
+        {
+          "task_id": 998,
+          "task_name": "BuildVisibilityLists",
+          "thread": "AnyThread",
+          "start_ms": 5100.8,
+          "duration_ms": 1.3,
+          "waits_for": [997]
+        },
+        {
+          "task_id": 999,
+          "task_name": "GatherLights",
+          "thread": "AnyThread",
+          "start_ms": 5102.4,
+          "duration_ms": 2.1,
+          "waits_for": [998]
+        },
+        {
+          "task_id": 1000,
+          "task_name": "FinalizeShadows",
+          "thread": "RenderThread",
+          "start_ms": 5104.8,
+          "duration_ms": 2.3,
+          "waits_for": [999]
+        }
+      ]
+    }
+  ],
+  "meta": {
+    "frame_index": "120",
+    "top": "3",
+    "data_source": "trace"
+  }
+}
+```
+
 ## 5.11 `symbols resolve`
 
 用途：

@@ -534,6 +534,68 @@ Sample output:
 }
 ```
 
+## 5.10.1 `tasks critical-path`
+
+Purpose:
+- Return weighted longest dependency paths for one frame.
+
+Options:
+- `--frame-index <n>` (required): Target frame index.
+- `--top <k>`: Number of critical paths to return. Default: `3`.
+
+Example:
+
+```powershell
+InsightCli.exe C:/traces/run01.utrace tasks critical-path --frame-index 120 --top 3
+```
+
+Sample output:
+
+```json
+{
+  "data": [
+    {
+      "path_rank": 1,
+      "frame_index": 120,
+      "total_duration_ms": 5.7,
+      "node_count": 3,
+      "partial": false,
+      "path": [
+        {
+          "task_id": 998,
+          "task_name": "BuildVisibilityLists",
+          "thread": "AnyThread",
+          "start_ms": 5100.8,
+          "duration_ms": 1.3,
+          "waits_for": [997]
+        },
+        {
+          "task_id": 999,
+          "task_name": "GatherLights",
+          "thread": "AnyThread",
+          "start_ms": 5102.4,
+          "duration_ms": 2.1,
+          "waits_for": [998]
+        },
+        {
+          "task_id": 1000,
+          "task_name": "FinalizeShadows",
+          "thread": "RenderThread",
+          "start_ms": 5104.8,
+          "duration_ms": 2.3,
+          "waits_for": [999]
+        }
+      ]
+    }
+  ],
+  "meta": {
+    "frame_index": "120",
+    "top": "3",
+    "data_source": "trace"
+  }
+}
+```
+
 ## 5.11 `symbols resolve`
 
 Purpose:
