@@ -41,6 +41,9 @@ Engine/Binaries/Win64/InsightCli.exe C:/Users/吴志伟/AppData/Local/UnrealEngi
 # Slow frames
 InsightCli.exe <trace_path> frames slowest --limit 5
 
+# Frame detail with per-thread breakdown
+InsightCli.exe <trace_path> frames detail --frame-index 120 --breakdown thread
+
 # CPU top scopes on game thread
 InsightCli.exe <trace_path> cpu top --thread GameThread --limit 10
 

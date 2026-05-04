@@ -198,11 +198,13 @@ InsightCli.exe C:/traces/run01.utrace frames slowest --limit 3
 
 参数：
 - `--frame-index <n>`（必填）：要查询的帧索引（从 0 开始）。
+- `--breakdown <thread|statgroup>`（可选）：按线程分桶或 stat group 分桶输出构成拆分。
 
 示例：
 
 ```powershell
 InsightCli.exe C:/traces/run01.utrace frames detail --frame-index 120
+InsightCli.exe C:/traces/run01.utrace frames detail --frame-index 120 --breakdown thread
 ```
 
 示例输出：
@@ -217,7 +219,11 @@ InsightCli.exe C:/traces/run01.utrace frames detail --frame-index 120
     "game_thread_ms": 10.1,
     "render_thread_ms": 8.3,
     "rhi_thread_ms": 4.2,
-    "gpu_ms": 12.9
+    "gpu_ms": 12.9,
+    "breakdown": [
+      { "bucket": "game_thread", "ms": 10.1, "ratio": 0.55 },
+      { "bucket": "render_thread", "ms": 8.3, "ratio": 0.45 }
+    ]
   }
 }
 ```

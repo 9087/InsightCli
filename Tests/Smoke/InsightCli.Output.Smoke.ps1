@@ -758,6 +758,46 @@ function Invoke-NormalTraceSmoke {
     $detailCases = @(
         (New-SmokeCase -Message "[$([IO.Path]::GetFileName($TracePath))] Verify frames detail behavior..." -Context 'frames detail behavior' -Args @($TracePath, 'frames', 'detail', '--frame-index', '1') -MustContain @('"data"', '"frame_index"') -Validate {
             param($result)
+            $framesDetailThreadBreakdownResult = Invoke-InsightCli -Args @($TracePath, 'frames', 'detail', '--frame-index', '1', '--breakdown', 'thread')
+            if ($framesDetailThreadBreakdownResult.ExitCode -ne 0) {
+                throw 'Expected zero exit code for frames detail thread breakdown'
+            }
+            $framesDetailThreadJson = Parse-JsonOutput -Text $framesDetailThreadBreakdownResult.Text -Context 'frames detail thread breakdown'
+            if ($framesDetailThreadJson.meta.breakdown -ne 'thread') {
+                throw 'Expected frames detail thread breakdown meta.breakdown=thread'
+            }
+            if ($null -eq $framesDetailThreadJson.data.breakdown) {
+                throw 'Expected frames detail thread breakdown to include data.breakdown'
+            }
+            foreach ($item in $framesDetailThreadJson.data.breakdown) {
+                if ([string]::IsNullOrWhiteSpace([string]$item.bucket)) {
+                    throw 'Expected bucket in frames detail thread breakdown rows'
+                }
+                if ($null -eq $item.ms -or $null -eq $item.ratio) {
+                    throw 'Expected ms and ratio in frames detail thread breakdown rows'
+                }
+            }
+
+            $framesDetailStatgroupBreakdownResult = Invoke-InsightCli -Args @($TracePath, 'frames', 'detail', '--frame-index', '1', '--breakdown', 'statgroup')
+            if ($framesDetailStatgroupBreakdownResult.ExitCode -ne 0) {
+                throw 'Expected zero exit code for frames detail statgroup breakdown'
+            }
+            $framesDetailStatgroupJson = Parse-JsonOutput -Text $framesDetailStatgroupBreakdownResult.Text -Context 'frames detail statgroup breakdown'
+            if ($framesDetailStatgroupJson.meta.breakdown -ne 'statgroup') {
+                throw 'Expected frames detail statgroup breakdown meta.breakdown=statgroup'
+            }
+            if ($null -eq $framesDetailStatgroupJson.data.breakdown) {
+                throw 'Expected frames detail statgroup breakdown to include data.breakdown'
+            }
+            foreach ($item in $framesDetailStatgroupJson.data.breakdown) {
+                if ([string]::IsNullOrWhiteSpace([string]$item.bucket)) {
+                    throw 'Expected bucket in frames detail statgroup breakdown rows'
+                }
+                if ($null -eq $item.ms -or $null -eq $item.ratio) {
+                    throw 'Expected ms and ratio in frames detail statgroup breakdown rows'
+                }
+            }
+
             $framesDetailInvalidResult = Invoke-InsightCli -Args @($TracePath, 'frames', 'detail', '--frame-index', 'abc')
             if ($framesDetailInvalidResult.ExitCode -eq 0) {
                 throw 'Expected non-zero exit code for frames detail --frame-index abc'
