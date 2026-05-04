@@ -359,5 +359,6 @@ bool HandleSymbolsCommands(const FInsightCliRequest& Request, const FTraceContex
 bool HandleCountersCommands(const FInsightCliRequest& Request, const FTraceContext& Context, FInsightCliResponse& OutResponse);
 bool HandleMemoryCommands(const FInsightCliRequest& Request, const FTraceContext& Context, FInsightCliResponse& OutResponse);
 bool HandleMarksCommands(const FInsightCliRequest& Request, const FTraceContext& Context, FInsightCliResponse& OutResponse);
+bool HandleLoadTimeCommands(const FInsightCliRequest& Request, const FTraceContext& Context, FInsightCliResponse& OutResponse);
 bool HandleDataCommands(const FInsightCliRequest& Request, const FTraceContext& Context, FInsightCliResponse& OutResponse);
 }

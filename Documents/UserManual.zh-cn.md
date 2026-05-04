@@ -16,6 +16,7 @@ InsightCli 是一个命令行工具，用于读取 Unreal trace 文件（`.utrac
 - `gpu`
 - `threads`
 - `tasks`
+- `loadtime`
 - `symbols`
 - `counters`
 - `memory`
@@ -872,6 +873,21 @@ InsightCli.exe C:/traces/run01.utrace marks around --timestamp 12000 --window 50
   }
 }
 ```
+
+## 5.11 `loadtime` 命令
+
+用途：
+- 基于 trace 的 `LoadTime` 通道分析资产/包加载耗时。
+
+命令：
+- `loadtime summary`
+- `loadtime packages --limit <n> --sort-by total|serialize|postload`
+- `loadtime slowest --limit <n>`
+- `loadtime timeline --time-start <ms> --time-end <ms>`
+
+说明：
+- 当 trace 未包含 LoadTime 通道时，命令会成功返回空数据，并在 `meta.channel_state` 给出提示。
+- `loadtime timeline` 会在 `meta` 中回显时间窗口信息。
 
 ## 6. 实用工作流
 

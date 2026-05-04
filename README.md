@@ -9,6 +9,7 @@ It reads `.utrace` / `.trace` inputs and returns machine-friendly JSON output fo
 - Frame analysis: `frames summary`, `frames slowest`, `frames detail`
 - CPU and GPU hotspots: `cpu top`, `cpu stack`, `gpu top`, `gpu pass-detail`
 - Threads and tasks: `threads waits`, `tasks top`
+- Asset loading diagnostics: `loadtime summary`, `loadtime packages`, `loadtime slowest`, `loadtime timeline`
 - Counters and memory: `counters list`, `counters series`, `counters stats`, `memory summary`, `memory peak`, `memory tags`
 - Marks and symbols: `marks search`, `marks around`, `symbols resolve`
 
@@ -53,6 +54,12 @@ InsightCli.exe <trace_path> counters list
 
 # Search marks by keyword
 InsightCli.exe <trace_path> marks search --keyword load
+
+# Load time package hotspots
+InsightCli.exe <trace_path> loadtime slowest --limit 10
+
+# Load time timeline in a time window
+InsightCli.exe <trace_path> loadtime timeline --time-start 0 --time-end 5000
 
 # List enabled/known trace channels
 InsightCli.exe <trace_path> info channels

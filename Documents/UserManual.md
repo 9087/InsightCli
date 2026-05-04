@@ -16,6 +16,7 @@ Supported command groups:
 - `gpu`
 - `threads`
 - `tasks`
+- `loadtime`
 - `symbols`
 - `counters`
 - `memory`
@@ -872,6 +873,21 @@ Sample output:
   }
 }
 ```
+
+## 5.11 `loadtime` commands
+
+Purpose:
+- Analyze asset/package loading cost from the trace `LoadTime` channel.
+
+Commands:
+- `loadtime summary`
+- `loadtime packages --limit <n> --sort-by total|serialize|postload`
+- `loadtime slowest --limit <n>`
+- `loadtime timeline --time-start <ms> --time-end <ms>`
+
+Notes:
+- If the trace does not include the LoadTime channel, the command returns success with empty data and `meta.channel_state`.
+- `loadtime timeline` echoes time-window metadata in `meta`.
 
 ## 6. Practical Workflows
 

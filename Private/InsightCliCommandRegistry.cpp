@@ -41,6 +41,10 @@ constexpr FCommandCatalogEntry CommandCatalog[] =
 	{ TEXT("memory"), TEXT("tags"), &HandleDataCommands },
 	{ TEXT("marks"), TEXT("search"), &HandleDataCommands },
 	{ TEXT("marks"), TEXT("around"), &HandleDataCommands },
+	{ TEXT("loadtime"), TEXT("summary"), &HandleDataCommands },
+	{ TEXT("loadtime"), TEXT("packages"), &HandleDataCommands },
+	{ TEXT("loadtime"), TEXT("slowest"), &HandleDataCommands },
+	{ TEXT("loadtime"), TEXT("timeline"), &HandleDataCommands },
 };
 
 const FCommandCatalogEntry* FindCatalogEntry(const FInsightCliRequest& Request)

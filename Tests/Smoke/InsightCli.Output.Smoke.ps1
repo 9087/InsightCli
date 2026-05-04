@@ -363,6 +363,61 @@ function Invoke-NormalTraceSmoke {
                 Assert-Descending -Items $json.data -Property 'queue_wait_ms' -Context 'tasks top'
             }
         }),
+        (New-SmokeCase -Message "[$([IO.Path]::GetFileName($TracePath))] Verify loadtime summary returns aggregate metrics..." -Context 'loadtime summary' -Args @($TracePath, 'loadtime', 'summary') -MustContain @('"data"', '"package_count"', '"total_load_ms"') -Validate {
+            param($result)
+            $json = Parse-JsonOutput -Text $result.Text -Context 'loadtime summary'
+            if ($null -eq $json.data.package_count) {
+                throw 'Expected loadtime summary to include package_count'
+            }
+            if ($null -eq $json.meta -or [string]::IsNullOrWhiteSpace([string]$json.meta.channel_state)) {
+                throw 'Expected loadtime summary meta.channel_state'
+            }
+        }),
+        (New-SmokeCase -Message "[$([IO.Path]::GetFileName($TracePath))] Verify loadtime packages supports limit and sort-by..." -Context 'loadtime packages' -Args @($TracePath, 'loadtime', 'packages', '--limit', '5', '--sort-by', 'serialize') -MustContain @('"data"', '"sort_by"') -Validate {
+            param($result)
+            $json = Parse-JsonOutput -Text $result.Text -Context 'loadtime packages'
+            if ($json.meta.sort_by -ne 'serialize') {
+                throw 'Expected loadtime packages meta.sort_by=serialize'
+            }
+            if ($json.data.Count -gt 5) {
+                throw 'Expected loadtime packages count <= limit'
+            }
+            foreach ($item in $json.data) {
+                if ([string]::IsNullOrWhiteSpace([string]$item.package_name)) {
+                    throw 'Expected package_name for each loadtime packages row'
+                }
+            }
+        }),
+        (New-SmokeCase -Message "[$([IO.Path]::GetFileName($TracePath))] Verify loadtime slowest returns sorted package rows..." -Context 'loadtime slowest' -Args @($TracePath, 'loadtime', 'slowest', '--limit', '3') -MustContain @('"data"') -Validate {
+            param($result)
+            $json = Parse-JsonOutput -Text $result.Text -Context 'loadtime slowest'
+            if ($json.data.Count -gt 3) {
+                throw 'Expected loadtime slowest count <= limit'
+            }
+            if ($json.data.Count -gt 0) {
+                foreach ($item in $json.data) {
+                    if ($null -eq $item.total_load_ms) {
+                        throw 'Expected total_load_ms in loadtime slowest rows when data is non-empty'
+                    }
+                }
+                Assert-Descending -Items $json.data -Property 'total_load_ms' -Context 'loadtime slowest'
+            }
+            elseif ([string]::IsNullOrWhiteSpace([string]$json.meta.channel_state)) {
+                throw 'Expected channel_state metadata for empty loadtime slowest response'
+            }
+        }),
+        (New-SmokeCase -Message "[$([IO.Path]::GetFileName($TracePath))] Verify loadtime timeline supports explicit time window..." -Context 'loadtime timeline' -Args @($TracePath, 'loadtime', 'timeline', '--time-start', '0', '--time-end', '5000') -MustContain @('"data"', '"time_window_source"') -Validate {
+            param($result)
+            $json = Parse-JsonOutput -Text $result.Text -Context 'loadtime timeline'
+            if ($json.meta.time_window_source -ne 'explicit') {
+                throw 'Expected loadtime timeline meta.time_window_source=explicit'
+            }
+            foreach ($item in $json.data) {
+                if ($null -eq $item.start_ms -or $null -eq $item.end_ms) {
+                    throw 'Expected start_ms/end_ms in loadtime timeline rows'
+                }
+            }
+        }),
         (New-SmokeCase -Message "[$([IO.Path]::GetFileName($TracePath))] Verify symbols resolve returns symbol mapping..." -Context 'symbols resolve' -Args @($TracePath, 'symbols', 'resolve', '--name', 'MoveActors') -Validate {
             param($result)
             $cpuTopResult = Invoke-InsightCli -Args @($TracePath, 'cpu', 'top', '--thread', 'GameThread', '--limit', '1')
