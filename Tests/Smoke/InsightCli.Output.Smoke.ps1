@@ -301,7 +301,77 @@ function Invoke-NormalTraceSmoke {
 
     $postDetailCases = @(
         (New-SmokeCase -Message "[$([IO.Path]::GetFileName($TracePath))] Verify cpu top returns scope list..." -Context 'cpu top' -Args @($TracePath, 'cpu', 'top', '--thread', 'GameThread', '--limit', '3') -MustContain @('"data"', '"scope_name"')),
-        (New-SmokeCase -Message "[$([IO.Path]::GetFileName($TracePath))] Verify cpu stack returns trace-backed stack data..." -Context 'cpu stack' -Args @($TracePath, 'cpu', 'stack', '--frame-index', '1', '--thread', 'GameThread', '--limit', '10') -MustContain @('"data"', '"stack"', '"data_source"')),
+        (New-SmokeCase -Message "[$([IO.Path]::GetFileName($TracePath))] Verify cpu stack top-down view returns trace-backed stack data..." -Context 'cpu stack top-down' -Args @($TracePath, 'cpu', 'stack', '--frame-index', '1', '--thread', 'GameThread', '--view', 'top-down', '--limit', '10') -MustContain @('"data"', '"stack"', '"data_source"') -Validate {
+            param($result)
+            $json = Parse-JsonOutput -Text $result.Text -Context 'cpu stack top-down'
+            if ($null -eq $json.data -or $json.data.Count -lt 1) {
+                throw 'Expected cpu stack top-down response to include at least one row'
+            }
+            if ($json.meta.view -ne 'top-down') {
+                throw 'Expected cpu stack top-down meta.view=top-down'
+            }
+            if ($null -eq $json.data[0].stack) {
+                throw 'Expected cpu stack top-down row to include stack array'
+            }
+        }),
+        (New-SmokeCase -Message "[$([IO.Path]::GetFileName($TracePath))] Verify cpu stack bottom-up view reverses stack order..." -Context 'cpu stack bottom-up' -Args @($TracePath, 'cpu', 'stack', '--frame-index', '1', '--thread', 'GameThread', '--view', 'bottom-up', '--limit', '10') -MustContain @('"data"', '"stack"', '"data_source"') -Validate {
+            param($result)
+            $json = Parse-JsonOutput -Text $result.Text -Context 'cpu stack bottom-up'
+            if ($null -eq $json.data -or $json.data.Count -lt 1) {
+                throw 'Expected cpu stack bottom-up response to include at least one row'
+            }
+            if ($json.meta.view -ne 'bottom-up') {
+                throw 'Expected cpu stack bottom-up meta.view=bottom-up'
+            }
+            if ($null -eq $json.data[0].stack) {
+                throw 'Expected cpu stack bottom-up row to include stack array'
+            }
+        }),
+        (New-SmokeCase -Message "[$([IO.Path]::GetFileName($TracePath))] Verify cpu stack leaf view returns self-time aggregation..." -Context 'cpu stack leaf' -Args @($TracePath, 'cpu', 'stack', '--frame-index', '1', '--thread', 'GameThread', '--view', 'leaf', '--limit', '10') -MustContain @('"data"', '"stack"', '"data_source"') -Validate {
+            param($result)
+            $json = Parse-JsonOutput -Text $result.Text -Context 'cpu stack leaf'
+            if ($null -eq $json.data -or $json.data.Count -lt 1) {
+                throw 'Expected cpu stack leaf response to include at least one row'
+            }
+            if ($json.meta.view -ne 'leaf') {
+                throw 'Expected cpu stack leaf meta.view=leaf'
+            }
+            if ($null -eq $json.data[0].stack) {
+                throw 'Expected cpu stack leaf row to include stack array'
+            }
+            foreach ($leaf in $json.data[0].stack) {
+                if ($null -eq $leaf.self_ms -or $null -eq $leaf.call_count) {
+                    throw 'Expected self_ms and call_count in cpu stack leaf rows'
+                }
+            }
+            if ($json.data[0].stack.Count -gt 0) {
+                Assert-Descending -Items $json.data[0].stack -Property 'self_ms' -Context 'cpu stack leaf'
+            }
+        }),
+        (New-SmokeCase -Message "[$([IO.Path]::GetFileName($TracePath))] Verify cpu hot-functions returns self-time ranking..." -Context 'cpu hot-functions' -Args @($TracePath, 'cpu', 'hot-functions', '--thread', 'GameThread', '--limit', '3') -MustContain @('"data"', '"self_ms"', '"sort_by"') -Validate {
+            param($result)
+            $json = Parse-JsonOutput -Text $result.Text -Context 'cpu hot-functions'
+            if ($null -eq $json.data) {
+                throw 'Expected cpu hot-functions response to include data array'
+            }
+            if ($json.data.Count -gt 3) {
+                throw 'Expected cpu hot-functions result count <= limit'
+            }
+            if ($json.meta.sort_by -ne 'self_ms_desc') {
+                throw 'Expected cpu hot-functions meta.sort_by=self_ms_desc'
+            }
+            if ($json.data.Count -gt 0) {
+                foreach ($item in $json.data) {
+                    if ($null -eq $item.scope_name -or [string]::IsNullOrWhiteSpace([string]$item.scope_name)) {
+                        throw 'Expected scope_name in cpu hot-functions rows'
+                    }
+                    if ($null -eq $item.self_ms) {
+                        throw 'Expected self_ms in cpu hot-functions rows'
+                    }
+                }
+                Assert-Descending -Items $json.data -Property 'self_ms' -Context 'cpu hot-functions'
+            }
+        }),
         (New-SmokeCase -Message "[$([IO.Path]::GetFileName($TracePath))] Verify gpu top returns valid list (possibly empty)..." -Context 'gpu top' -Args @($TracePath, 'gpu', 'top', '--limit', '3') -MustContain @('"data"') -Validate {
             param($result)
             $json = Parse-JsonOutput -Text $result.Text -Context 'gpu top'

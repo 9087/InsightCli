@@ -7,7 +7,7 @@ It reads `.utrace` / `.trace` inputs and returns machine-friendly JSON output fo
 
 - Session and trace metadata: `info summary`, `info channels`
 - Frame analysis: `frames summary`, `frames slowest`, `frames detail`
-- CPU and GPU hotspots: `cpu top`, `cpu stack`, `gpu top`, `gpu passes`, `gpu pass-detail`
+- CPU and GPU hotspots: `cpu top`, `cpu stack`, `cpu hot-functions`, `gpu top`, `gpu passes`, `gpu pass-detail`
 - Threads and tasks: `threads waits`, `threads wait-chain`, `tasks top`, `tasks critical-path`
 - Asset loading diagnostics: `loadtime summary`, `loadtime packages`, `loadtime slowest`, `loadtime timeline`
 - GC diagnostics: `gc summary`, `gc events`, `gc longest`
@@ -43,6 +43,12 @@ InsightCli.exe <trace_path> frames slowest --limit 5
 
 # CPU top scopes on game thread
 InsightCli.exe <trace_path> cpu top --thread GameThread --limit 10
+
+# CPU stack bottom-up view for one frame
+InsightCli.exe <trace_path> cpu stack --frame-index 120 --thread GameThread --view bottom-up --limit 10
+
+# CPU hot functions ranked by self-time
+InsightCli.exe <trace_path> cpu hot-functions --thread GameThread --limit 10
 
 # GPU pass detail for a frame
 InsightCli.exe <trace_path> gpu pass-detail --frame-index 120 --pass BasePass --limit 5

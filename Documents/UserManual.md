@@ -286,11 +286,12 @@ Options:
 - `--frame-index <n>` (required): Frame to inspect (zero-based).
 - `--thread <...>` (optional): Restrict stack output to one thread. If omitted, command-selected default thread is used.
 - `--limit <n>` (optional): Cap returned stack rows.
+- `--view <mode>` (optional): One of `top-down`, `bottom-up`, `leaf`. Default: `top-down`.
 
 Example:
 
 ```powershell
-InsightCli.exe C:/traces/run01.utrace cpu stack --frame-index 120 --thread GameThread --limit 10
+InsightCli.exe C:/traces/run01.utrace cpu stack --frame-index 120 --thread GameThread --view top-down --limit 10
 ```
 
 Sample output:
@@ -312,6 +313,51 @@ Sample output:
       ]
     }
   ]
+}
+```
+
+Notes:
+- `top-down`: root-to-leaf call chain.
+- `bottom-up`: leaf-to-root reversed call chain.
+- `leaf`: aggregate self-time by leaf function name inside the selected frame/thread.
+
+## 5.6.1 `cpu hot-functions`
+
+Purpose:
+- List CPU functions sorted by `self_ms` descending.
+
+Options:
+- `--thread <name|id>`: CPU thread filter, for example `GameThread`.
+- `--limit <n>`: Maximum row count to return.
+
+Example:
+
+```powershell
+InsightCli.exe C:/traces/run01.utrace cpu hot-functions --thread GameThread --limit 5
+```
+
+Sample output:
+
+```json
+{
+  "data": [
+    {
+      "scope_name": "FSceneRenderer::Render",
+      "thread_id": 1234,
+      "call_count": 88,
+      "total_ms": 122.4,
+      "avg_ms": 1.39,
+      "max_ms": 4.92,
+      "min_ms": 0.12,
+      "self_ms": 38.7
+    }
+  ],
+  "meta": {
+    "limit": "5",
+    "sort_by": "self_ms_desc",
+    "thread": "GameThread",
+    "data_source": "trace"
+  }
 }
 ```
 

@@ -55,8 +55,6 @@ InsightCli.exe C:/traces/run01.utrace frames summary
 
 ### 3.2 错误输出
 
-错误时会在 `stderr` 输出 JSON。
-
 示例：
 
 ```json
@@ -286,11 +284,12 @@ InsightCli.exe C:/traces/run01.utrace cpu top --thread GameThread --limit 5
 - `--frame-index <n>`（必填）：目标帧索引（从 0 开始）。
 - `--thread <...>`（可选）：仅返回指定线程的栈式 scope。
 - `--limit <n>`（可选）：限制返回行数。
+- `--view <mode>`（可选）：可选 `top-down`、`bottom-up`、`leaf`，默认 `top-down`。
 
 示例：
 
 ```powershell
-InsightCli.exe C:/traces/run01.utrace cpu stack --frame-index 120 --thread GameThread --limit 10
+InsightCli.exe C:/traces/run01.utrace cpu stack --frame-index 120 --thread GameThread --view top-down --limit 10
 ```
 
 示例输出：
@@ -312,6 +311,51 @@ InsightCli.exe C:/traces/run01.utrace cpu stack --frame-index 120 --thread GameT
       ]
     }
   ]
+}
+```
+
+说明：
+- `top-down`：从根到叶的调用链。
+- `bottom-up`：从叶到根的反向调用链。
+- `leaf`：在选定帧/线程内按叶子函数名聚合 `self_ms`。
+
+## 5.6.1 `cpu hot-functions`
+
+用途：
+- 按 `self_ms` 降序列出 CPU 热函数。
+
+参数：
+- `--thread <name|id>`：线程过滤，例如 `GameThread`。
+- `--limit <n>`：返回条数上限。
+
+示例：
+
+```powershell
+InsightCli.exe C:/traces/run01.utrace cpu hot-functions --thread GameThread --limit 5
+```
+
+示例输出：
+
+```json
+{
+  "data": [
+    {
+      "scope_name": "FSceneRenderer::Render",
+      "thread_id": 1234,
+      "call_count": 88,
+      "total_ms": 122.4,
+      "avg_ms": 1.39,
+      "max_ms": 4.92,
+      "min_ms": 0.12,
+      "self_ms": 38.7
+    }
+  ],
+  "meta": {
+    "limit": "5",
+    "sort_by": "self_ms_desc",
+    "thread": "GameThread",
+    "data_source": "trace"
+  }
 }
 ```
 

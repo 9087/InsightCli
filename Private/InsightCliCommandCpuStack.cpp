@@ -2,6 +2,7 @@
 
 #include "InsightCliCommandContext.h"
 
+#include "Algo/Reverse.h"
 #include "TraceServices/Model/AnalysisSession.h"
 #include "TraceServices/Model/Threads.h"
 #include "TraceServices/Model/TimingProfiler.h"
@@ -13,6 +14,7 @@ bool BuildCpuStackObject(
 	int32 FrameIndex,
 	const TOptional<uint32>& CpuThreadId,
 	int32 StackLimit,
+	const FString& View,
 	TSharedPtr<FJsonObject>& OutObject,
 	bool& bOutFound,
 	FString& OutFailureStage,
@@ -321,33 +323,152 @@ bool BuildCpuStackObject(
 		Item->SetNumberField(TEXT("self_ms"), 0.0);
 	}
 
-	TArray<TSharedPtr<FJsonValue>> Stack;
-	Stack.Reserve(Chain.Num());
-	for (const FRangeEvent& Row : Chain)
+	TArray<FRangeEvent> DisplayChain = Chain;
+	if (View.Equals(TEXT("bottom-up"), ESearchCase::IgnoreCase))
 	{
-		const TSharedRef<FJsonObject> StackItem = MakeShared<FJsonObject>();
-		FString Name = TEXT("<unknown>");
-		FString File;
-		int32 Line = 0;
-		if (Row.TimerId < static_cast<uint32>(Timers.Num()) && Timers[Row.TimerId].bValid)
+		Algo::Reverse(DisplayChain);
+	}
+
+	TArray<TSharedPtr<FJsonValue>> Stack;
+	if (View.Equals(TEXT("leaf"), ESearchCase::IgnoreCase))
+	{
+		struct FLeafAggregate
 		{
-			const FTimerSnapshot& Snapshot = Timers[Row.TimerId];
-			Name = Snapshot.Name;
-			File = Snapshot.File;
-			Line = Snapshot.Line;
+			FString Name;
+			FString File;
+			int32 Line = 0;
+			double SelfMs = 0.0;
+			int32 CallCount = 0;
+		};
+
+		TMap<FString, FLeafAggregate> AggregateByName;
+		for (const FRangeEvent& Row : RangeEvents)
+		{
+			if (Row.EndSec <= Row.StartSec)
+			{
+				continue;
+			}
+
+			double DirectChildrenMs = 0.0;
+			for (const FRangeEvent& Child : RangeEvents)
+			{
+				if (Child.Depth != Row.Depth + 1)
+				{
+					continue;
+				}
+				const double OverlapStart = FMath::Max(Child.StartSec, Row.StartSec);
+				const double OverlapEnd = FMath::Min(Child.EndSec, Row.EndSec);
+				if (OverlapEnd > OverlapStart)
+				{
+					DirectChildrenMs += (OverlapEnd - OverlapStart) * 1000.0;
+				}
+			}
+
+			const double TotalMs = (Row.EndSec - Row.StartSec) * 1000.0;
+			const double SelfMs = FMath::Max(0.0, TotalMs - DirectChildrenMs);
+			if (SelfMs <= 0.0)
+			{
+				continue;
+			}
+
+			FString Name = TEXT("<unknown>");
+			FString File;
+			int32 Line = 0;
+			if (Row.TimerId < static_cast<uint32>(Timers.Num()) && Timers[Row.TimerId].bValid)
+			{
+				const FTimerSnapshot& Snapshot = Timers[Row.TimerId];
+				Name = Snapshot.Name;
+				File = Snapshot.File;
+				Line = Snapshot.Line;
+			}
+
+			FLeafAggregate* Existing = AggregateByName.Find(Name);
+			if (Existing == nullptr)
+			{
+				FLeafAggregate NewEntry;
+				NewEntry.Name = Name;
+				NewEntry.File = File;
+				NewEntry.Line = Line;
+				NewEntry.SelfMs = SelfMs;
+				NewEntry.CallCount = 1;
+				AggregateByName.Add(Name, MoveTemp(NewEntry));
+			}
+			else
+			{
+				Existing->SelfMs += SelfMs;
+				Existing->CallCount += 1;
+				if (Existing->File.IsEmpty() && !File.IsEmpty())
+				{
+					Existing->File = File;
+					Existing->Line = Line;
+				}
+			}
 		}
 
-		StackItem->SetStringField(TEXT("function"), Name);
-		StackItem->SetStringField(TEXT("module"), InferModuleName(File, Name));
-		if (!File.IsEmpty())
+		TArray<FLeafAggregate> LeafRows;
+		AggregateByName.GenerateValueArray(LeafRows);
+		LeafRows.Sort([](const FLeafAggregate& A, const FLeafAggregate& B)
 		{
-			StackItem->SetStringField(TEXT("file"), File);
-		}
-		if (Line > 0)
+			if (A.SelfMs == B.SelfMs)
+			{
+				return A.Name < B.Name;
+			}
+			return A.SelfMs > B.SelfMs;
+		});
+
+		if (StackLimit > 0 && LeafRows.Num() > StackLimit)
 		{
-			StackItem->SetNumberField(TEXT("line"), Line);
+			LeafRows.SetNum(StackLimit, EAllowShrinking::No);
 		}
-		Stack.Add(MakeShared<FJsonValueObject>(StackItem));
+
+		Stack.Reserve(LeafRows.Num());
+		for (const FLeafAggregate& Row : LeafRows)
+		{
+			const TSharedRef<FJsonObject> StackItem = MakeShared<FJsonObject>();
+			StackItem->SetStringField(TEXT("function"), Row.Name);
+			StackItem->SetStringField(TEXT("module"), InferModuleName(Row.File, Row.Name));
+			StackItem->SetNumberField(TEXT("self_ms"), Row.SelfMs);
+			StackItem->SetNumberField(TEXT("call_count"), Row.CallCount);
+			if (!Row.File.IsEmpty())
+			{
+				StackItem->SetStringField(TEXT("file"), Row.File);
+			}
+			if (Row.Line > 0)
+			{
+				StackItem->SetNumberField(TEXT("line"), Row.Line);
+			}
+			Stack.Add(MakeShared<FJsonValueObject>(StackItem));
+		}
+	}
+	else
+	{
+		Stack.Reserve(DisplayChain.Num());
+		for (const FRangeEvent& Row : DisplayChain)
+		{
+			const TSharedRef<FJsonObject> StackItem = MakeShared<FJsonObject>();
+			FString Name = TEXT("<unknown>");
+			FString File;
+			int32 Line = 0;
+			if (Row.TimerId < static_cast<uint32>(Timers.Num()) && Timers[Row.TimerId].bValid)
+			{
+				const FTimerSnapshot& Snapshot = Timers[Row.TimerId];
+				Name = Snapshot.Name;
+				File = Snapshot.File;
+				Line = Snapshot.Line;
+			}
+
+			StackItem->SetStringField(TEXT("function"), Name);
+			StackItem->SetStringField(TEXT("module"), InferModuleName(File, Name));
+			if (!File.IsEmpty())
+			{
+				StackItem->SetStringField(TEXT("file"), File);
+			}
+			if (Line > 0)
+			{
+				StackItem->SetNumberField(TEXT("line"), Line);
+			}
+			Stack.Add(MakeShared<FJsonValueObject>(StackItem));
+		}
 	}
 
 	Item->SetArrayField(TEXT("stack"), Stack);

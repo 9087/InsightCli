@@ -243,6 +243,7 @@ bool BuildCpuStackObject(
 	int32 FrameIndex,
 	const TOptional<uint32>& CpuThreadId,
 	int32 StackLimit,
+	const FString& View,
 	TSharedPtr<FJsonObject>& OutObject,
 	bool& bOutFound,
 	FString& OutFailureStage,

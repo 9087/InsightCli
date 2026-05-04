@@ -27,6 +27,7 @@ constexpr FCommandCatalogEntry CommandCatalog[] =
 	{ TEXT("frames"), TEXT("detail"), &HandleInfoAndFramesCommands },
 	{ TEXT("cpu"), TEXT("top"), &HandlePerformanceCommands },
 	{ TEXT("cpu"), TEXT("stack"), &HandlePerformanceCommands },
+	{ TEXT("cpu"), TEXT("hot-functions"), &HandlePerformanceCommands },
 	{ TEXT("gpu"), TEXT("top"), &HandlePerformanceCommands },
 	{ TEXT("gpu"), TEXT("passes"), &HandlePerformanceCommands },
 	{ TEXT("gpu"), TEXT("pass-detail"), &HandlePerformanceCommands },
