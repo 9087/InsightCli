@@ -565,6 +565,35 @@ Purpose:
 Notes:
 - When mesh-level channels are unavailable, output uses a single `unknown` bucket.
 
+## 5.8.6 `slate top-widgets`
+
+Purpose:
+- Return top Slate/UMG widget scopes by selected metric.
+
+Options:
+- `--by paint|tick|invalidation`: Select aggregation metric (default `paint`).
+- `--limit <n>`: Maximum row count.
+
+## 5.8.7 `slate paint-cost`
+
+Purpose:
+- Return frame-oriented Slate paint cost approximation.
+
+Options:
+- `--frame-index <n>`: Target frame index.
+
+## 5.8.8 `slate invalidation-rate`
+
+Purpose:
+- Return Slate invalidation event rate in a time window.
+
+Options:
+- `--time-start <ms>`: Inclusive start timestamp.
+- `--time-end <ms>`: Exclusive end timestamp.
+
+Notes:
+- If Slate trace channel data is unavailable, this command falls back to CPU scope name pattern approximation and emits `meta.warning`.
+
 ## 5.9 `threads waits`
 
 Purpose:

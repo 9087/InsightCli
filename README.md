@@ -8,6 +8,7 @@ It reads `.utrace` / `.trace` inputs and returns machine-friendly JSON output fo
 - Session and trace metadata: `info summary`, `info channels`
 - Frame analysis: `frames summary`, `frames slowest`, `frames detail`
 - CPU/GPU/RHI hotspots: `cpu top`, `cpu stack`, `cpu hot-functions`, `gpu top`, `gpu passes`, `gpu pass-detail`, `rhi summary`, `rhi drawcalls`, `rhi top-materials`, `rhi top-meshes`
+- UI/Slate diagnostics: `slate top-widgets`, `slate paint-cost`, `slate invalidation-rate`
 - Threads and tasks: `threads waits`, `threads wait-chain`, `tasks top`, `tasks critical-path`
 - Asset loading diagnostics: `loadtime summary`, `loadtime packages`, `loadtime slowest`, `loadtime timeline`
 - GC diagnostics: `gc summary`, `gc events`, `gc longest`
@@ -62,6 +63,10 @@ InsightCli.exe <trace_path> gpu passes --frame-index 120
 # RHI summary and drawcall hotspots
 InsightCli.exe <trace_path> rhi summary --frame-index 120
 InsightCli.exe <trace_path> rhi drawcalls --limit 10
+
+# Slate/UMG diagnostics
+InsightCli.exe <trace_path> slate top-widgets --by paint --limit 10
+InsightCli.exe <trace_path> slate invalidation-rate --time-start 0 --time-end 1000
 
 # Counter statistics
 InsightCli.exe <trace_path> counters stats --name ActorCount

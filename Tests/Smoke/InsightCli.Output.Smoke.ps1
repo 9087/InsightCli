@@ -452,6 +452,58 @@ function Invoke-NormalTraceSmoke {
                 Assert-Descending -Items $json.data -Property 'draw_call_count' -Context 'rhi drawcalls'
             }
         }),
+        (New-SmokeCase -Message "[$([IO.Path]::GetFileName($TracePath))] Verify slate top-widgets returns rows..." -Context 'slate top-widgets' -Args @($TracePath, 'slate', 'top-widgets', '--by', 'paint', '--limit', '3') -MustContain @('"data"') -Validate {
+            param($result)
+            $json = Parse-JsonOutput -Text $result.Text -Context 'slate top-widgets'
+            if ($null -eq $json.data) {
+                throw 'Expected slate top-widgets response to include data array'
+            }
+            if ($json.data.Count -gt 3) {
+                throw 'Expected slate top-widgets count <= limit'
+            }
+            foreach ($item in $json.data) {
+                if ([string]::IsNullOrWhiteSpace([string]$item.widget)) {
+                    throw 'Expected widget in slate top-widgets rows'
+                }
+                if ($null -eq $item.total_ms -or $null -eq $item.call_count) {
+                    throw 'Expected total_ms and call_count in slate top-widgets rows'
+                }
+            }
+        }),
+        (New-SmokeCase -Message "[$([IO.Path]::GetFileName($TracePath))] Verify slate paint-cost returns paint metrics..." -Context 'slate paint-cost' -Args @($TracePath, 'slate', 'paint-cost', '--frame-index', '1') -MustContain @('"paint_ms"') -Validate {
+            param($result)
+            $json = Parse-JsonOutput -Text $result.Text -Context 'slate paint-cost'
+            if ($null -eq $json.data) {
+                throw 'Expected slate paint-cost response to include data object'
+            }
+            foreach ($field in @('frame_index', 'paint_ms', 'approx_widget_count')) {
+                if ($null -eq $json.data.$field) {
+                    throw "Expected slate paint-cost field: $field"
+                }
+            }
+        }),
+        (New-SmokeCase -Message "[$([IO.Path]::GetFileName($TracePath))] Verify slate invalidation-rate returns rate metrics..." -Context 'slate invalidation-rate' -Args @($TracePath, 'slate', 'invalidation-rate', '--time-start', '0', '--time-end', '1000') -MustContain @('"invalidations_per_sec"') -Validate {
+            param($result)
+            $json = Parse-JsonOutput -Text $result.Text -Context 'slate invalidation-rate'
+            if ($null -eq $json.data) {
+                throw 'Expected slate invalidation-rate response to include data object'
+            }
+            foreach ($field in @('invalidation_events', 'window_ms', 'invalidations_per_sec')) {
+                if ($null -eq $json.data.$field) {
+                    throw "Expected slate invalidation-rate field: $field"
+                }
+            }
+        }),
+        (New-SmokeCase -Message "[$([IO.Path]::GetFileName($TracePath))] Verify slate invalidation-rate includes fallback warning path..." -Context 'slate invalidation-rate warning' -Args @($TracePath, 'slate', 'invalidation-rate', '--time-start', '0', '--time-end', '1') -MustContain @('"warning"') -Validate {
+            param($result)
+            $json = Parse-JsonOutput -Text $result.Text -Context 'slate invalidation-rate warning'
+            if ($json.meta.data_source -ne 'cpu_scope_pattern') {
+                throw 'Expected slate invalidation-rate warning meta.data_source=cpu_scope_pattern'
+            }
+            if ([string]::IsNullOrWhiteSpace([string]$json.meta.warning)) {
+                throw 'Expected slate invalidation-rate warning metadata'
+            }
+        }),
         (New-SmokeCase -Message "[$([IO.Path]::GetFileName($TracePath))] Verify threads waits returns trace-backed wait diagnostics..." -Context 'threads waits' -Args @($TracePath, 'threads', 'waits', '--frame-index', '1', '--limit', '3') -MustContain @('"data"', '"data_source"') -Validate {
             param($result)
             $json = Parse-JsonOutput -Text $result.Text -Context 'threads waits'

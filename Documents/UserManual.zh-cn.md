@@ -563,6 +563,35 @@ InsightCli.exe C:/traces/run01.utrace rhi drawcalls --limit 5
 说明：
 - 当 mesh 维度 channel 不可用时，输出单个 `unknown` 分桶。
 
+## 5.8.6 `slate top-widgets`
+
+用途：
+- 按指定维度返回 Slate/UMG widget 热点。
+
+参数：
+- `--by paint|tick|invalidation`：选择聚合维度（默认 `paint`）。
+- `--limit <n>`：返回记录数量上限。
+
+## 5.8.7 `slate paint-cost`
+
+用途：
+- 返回按帧统计的 Slate paint 开销近似值。
+
+参数：
+- `--frame-index <n>`：目标帧索引。
+
+## 5.8.8 `slate invalidation-rate`
+
+用途：
+- 返回时间窗口内 Slate invalidation 事件速率。
+
+参数：
+- `--time-start <ms>`：时间窗口起点（包含）。
+- `--time-end <ms>`：时间窗口终点（不包含）。
+
+说明：
+- 当 Slate channel 不可用时，命令会回退到 CPU scope 名称模式近似，并在 `meta.warning` 标注。
+
 ## 5.9 `threads waits`
 
 用途：
