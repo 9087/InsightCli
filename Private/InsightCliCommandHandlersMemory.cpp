@@ -108,7 +108,7 @@ bool TryBuildTagWindowStats(
 
 bool HandleMemoryCommands(const FInsightCliRequest& Request, const FTraceContext& Context, FInsightCliResponse& OutResponse)
 {
-	// Handles memory/summary, memory/peak, memory/series, memory/tags, memory/alloc-top, and memory/leak-suspect.
+	// Handles memory/summary, memory/peak, memory/series, memory/tags, memory/diff, memory/alloc-top, and memory/leak-suspect.
 	if (Request.Group == TEXT("memory") && Request.Action == TEXT("summary"))
 	{
 		FInsightCliResponse UnknownOptionError;
@@ -304,6 +304,169 @@ bool HandleMemoryCommands(const FInsightCliRequest& Request, const FTraceContext
 		Meta.Add(TEXT("data_source"), TEXT("trace"));
 		Meta.Add(TEXT("limit"), FString::FromInt(Limit));
 		AppendTimeWindowMeta(TimeWindow, Meta);
+		OutResponse = FInsightCliResponse::Ok(MakeEnvelopeWithArray(Data, Meta));
+		return true;
+	}
+
+	if (Request.Group == TEXT("memory") && Request.Action == TEXT("diff"))
+	{
+		FInsightCliResponse UnknownOptionError;
+		if (!ValidateNoUnknownOptionsWithGlobals(Request.Args, { TEXT("t1"), TEXT("t2"), TEXT("limit") }, UnknownOptionError))
+		{
+			OutResponse = UnknownOptionError;
+			return true;
+		}
+
+		double T1Sec = 0.0;
+		double T2Sec = 0.0;
+		if (!TryGetDoubleOption(Request.Args, TEXT("--t1"), T1Sec))
+		{
+			OutResponse = MakeOptionError(TEXT("--t1 is required for memory diff."));
+			return true;
+		}
+		if (!TryGetDoubleOption(Request.Args, TEXT("--t2"), T2Sec))
+		{
+			OutResponse = MakeOptionError(TEXT("--t2 is required for memory diff."));
+			return true;
+		}
+		if (T1Sec < 0.0 || T2Sec < 0.0)
+		{
+			OutResponse = MakeOptionError(TEXT("t1/t2 must be >= 0."));
+			return true;
+		}
+		if (T2Sec < T1Sec)
+		{
+			OutResponse = MakeOptionError(TEXT("t2 must be >= t1."));
+			return true;
+		}
+
+		int32 Limit = 20;
+		FInsightCliResponse LimitError;
+		if (!TryGetPositiveLimit(Request.Args, 20, Limit, LimitError))
+		{
+			OutResponse = LimitError;
+			return true;
+		}
+
+		TMap<FString, FTagWindowStat> T1Stats;
+		double DurationSec = 0.0;
+		FString Warning;
+		FString FailureStage;
+		FString FailureReason;
+		if (!TryBuildTagWindowStats(Context, {}, T1Sec, T1Stats, DurationSec, Warning, FailureStage, FailureReason))
+		{
+			OutResponse = MakeTraceUnavailableError(
+				Context,
+				TEXT("memory.diff"),
+				FailureStage,
+				FailureReason,
+				TEXT("memory_diff"),
+				TEXT("failed to build t1 memory snapshot"),
+				TEXT("Trace-backed memory diff is unavailable for this trace."));
+			return true;
+		}
+
+		TMap<FString, FTagWindowStat> T2Stats;
+		double IgnoredDurationSec = 0.0;
+		FString T2Warning;
+		if (!TryBuildTagWindowStats(Context, {}, T2Sec, T2Stats, IgnoredDurationSec, T2Warning, FailureStage, FailureReason))
+		{
+			OutResponse = MakeTraceUnavailableError(
+				Context,
+				TEXT("memory.diff"),
+				FailureStage,
+				FailureReason,
+				TEXT("memory_diff"),
+				TEXT("failed to build t2 memory snapshot"),
+				TEXT("Trace-backed memory diff is unavailable for this trace."));
+			return true;
+		}
+
+		struct FDiffRow
+		{
+			FString TagName;
+			int64 DeltaBytes = 0;
+			int32 DeltaAllocCount = 0;
+			int64 T1Bytes = 0;
+			int64 T2Bytes = 0;
+		};
+
+		TSet<FString> TagNames;
+		for (const TPair<FString, FTagWindowStat>& Pair : T1Stats)
+		{
+			TagNames.Add(Pair.Key);
+		}
+		for (const TPair<FString, FTagWindowStat>& Pair : T2Stats)
+		{
+			TagNames.Add(Pair.Key);
+		}
+
+		TArray<FDiffRow> Rows;
+		Rows.Reserve(TagNames.Num());
+		for (const FString& TagName : TagNames)
+		{
+			const FTagWindowStat* T1Stat = T1Stats.Find(TagName);
+			const FTagWindowStat* T2Stat = T2Stats.Find(TagName);
+
+			const int64 T1Bytes = (T1Stat != nullptr) ? T1Stat->LastValue : 0;
+			const int64 T2Bytes = (T2Stat != nullptr) ? T2Stat->LastValue : 0;
+			const int32 T1Count = (T1Stat != nullptr) ? T1Stat->SampleCount : 0;
+			const int32 T2Count = (T2Stat != nullptr) ? T2Stat->SampleCount : 0;
+
+			const int64 DeltaBytes = T2Bytes - T1Bytes;
+			const int32 DeltaAllocCount = FMath::Max(0, T2Count - T1Count);
+			if (DeltaBytes == 0 && DeltaAllocCount == 0)
+			{
+				continue;
+			}
+
+			FDiffRow Row;
+			Row.TagName = TagName;
+			Row.DeltaBytes = DeltaBytes;
+			Row.DeltaAllocCount = DeltaAllocCount;
+			Row.T1Bytes = T1Bytes;
+			Row.T2Bytes = T2Bytes;
+			Rows.Add(MoveTemp(Row));
+		}
+
+		Rows.Sort([](const FDiffRow& A, const FDiffRow& B)
+		{
+			if (A.DeltaBytes == B.DeltaBytes)
+			{
+				return A.TagName < B.TagName;
+			}
+			return A.DeltaBytes > B.DeltaBytes;
+		});
+
+		const int32 TakeCount = FMath::Min(Limit, Rows.Num());
+		TArray<TSharedPtr<FJsonValue>> Data;
+		Data.Reserve(TakeCount);
+		for (int32 Index = 0; Index < TakeCount; ++Index)
+		{
+			const FDiffRow& Row = Rows[Index];
+			const TSharedRef<FJsonObject> Item = MakeShared<FJsonObject>();
+			Item->SetStringField(TEXT("tag_name"), Row.TagName);
+			Item->SetNumberField(TEXT("delta_bytes"), static_cast<double>(Row.DeltaBytes));
+			Item->SetNumberField(TEXT("delta_alloc_count"), Row.DeltaAllocCount);
+			Item->SetNumberField(TEXT("t1_bytes"), static_cast<double>(Row.T1Bytes));
+			Item->SetNumberField(TEXT("t2_bytes"), static_cast<double>(Row.T2Bytes));
+			Data.Add(MakeShared<FJsonValueObject>(Item));
+		}
+
+		TMap<FString, FString> Meta;
+		Meta.Add(TEXT("limit"), FString::FromInt(Limit));
+		Meta.Add(TEXT("t1_sec"), ToNumberString(T1Sec));
+		Meta.Add(TEXT("t2_sec"), ToNumberString(T2Sec));
+		Meta.Add(TEXT("data_source"), Warning.IsEmpty() ? TEXT("trace") : TEXT("unavailable"));
+		if (!Warning.IsEmpty())
+		{
+			Meta.Add(TEXT("warning"), Warning);
+		}
+		else if (!T2Warning.IsEmpty())
+		{
+			Meta.Add(TEXT("warning"), T2Warning);
+		}
+
 		OutResponse = FInsightCliResponse::Ok(MakeEnvelopeWithArray(Data, Meta));
 		return true;
 	}

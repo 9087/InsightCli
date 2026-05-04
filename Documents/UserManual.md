@@ -1026,6 +1026,38 @@ Sample output:
 Notes:
 - `--by callstack` currently returns an empty `data` array with `meta.warning`.
 
+## 5.19.1 `memory diff`
+
+Purpose:
+- Diff memory tag snapshots between two timestamps.
+
+Options:
+- `--t1 <sec>` (required): Start snapshot timestamp in seconds.
+- `--t2 <sec>` (required): End snapshot timestamp in seconds.
+- `--limit <n>`: Maximum number of rows returned.
+
+Example:
+
+```powershell
+InsightCli.exe C:/traces/run01.utrace memory diff --t1 0 --t2 5 --limit 5
+```
+
+Sample output:
+
+```json
+{
+  "data": [
+    { "tag_name": "Textures", "delta_bytes": 104857600, "delta_alloc_count": 12, "t1_bytes": 734003200, "t2_bytes": 838860800 }
+  ],
+  "meta": {
+    "data_source": "trace",
+    "t1_sec": "0",
+    "t2_sec": "5",
+    "limit": "5"
+  }
+}
+```
+
 ## 5.20 `memory leak-suspect`
 
 Purpose:

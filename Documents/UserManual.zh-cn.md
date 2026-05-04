@@ -1024,6 +1024,38 @@ InsightCli.exe C:/traces/run01.utrace memory alloc-top --by tag --limit 5
 说明：
 - `--by callstack` 当前会返回空 `data`，并在 `meta.warning` 中提示原因。
 
+## 5.19.1 `memory diff`
+
+用途：
+- 对两个时间点的内存 tag 快照做增量对比。
+
+参数：
+- `--t1 <sec>`（必填）：起始快照时间点（秒）。
+- `--t2 <sec>`（必填）：结束快照时间点（秒）。
+- `--limit <n>`：返回记录数量上限。
+
+示例：
+
+```powershell
+InsightCli.exe C:/traces/run01.utrace memory diff --t1 0 --t2 5 --limit 5
+```
+
+示例输出：
+
+```json
+{
+  "data": [
+    { "tag_name": "Textures", "delta_bytes": 104857600, "delta_alloc_count": 12, "t1_bytes": 734003200, "t2_bytes": 838860800 }
+  ],
+  "meta": {
+    "data_source": "trace",
+    "t1_sec": "0",
+    "t2_sec": "5",
+    "limit": "5"
+  }
+}
+```
+
 ## 5.20 `memory leak-suspect`
 
 用途：

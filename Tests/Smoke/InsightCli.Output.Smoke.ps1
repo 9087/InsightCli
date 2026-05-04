@@ -855,6 +855,34 @@ function Invoke-NormalTraceSmoke {
                 }
             }
 
+            $memoryDiffResult = Invoke-InsightCli -Args @($TracePath, 'memory', 'diff', '--t1', '0', '--t2', '5', '--limit', '3')
+            if ($memoryDiffResult.ExitCode -ne 0) {
+                throw 'Expected zero exit code for memory diff'
+            }
+            $diffJson = Parse-JsonOutput -Text $memoryDiffResult.Text -Context 'memory diff'
+            if ($diffJson.data.Count -gt 3) {
+                throw 'Expected memory diff count <= limit'
+            }
+            if ([double]$diffJson.meta.t1_sec -ne 0 -or [double]$diffJson.meta.t2_sec -ne 5) {
+                throw 'Expected memory diff metadata to echo t1_sec/t2_sec values'
+            }
+            if ($diffJson.meta.data_source -eq 'trace') {
+                foreach ($item in $diffJson.data) {
+                    if ([string]::IsNullOrWhiteSpace([string]$item.tag_name)) {
+                        throw 'Expected tag_name in memory diff rows'
+                    }
+                    if ($null -eq $item.delta_bytes -or $null -eq $item.delta_alloc_count) {
+                        throw 'Expected delta_bytes and delta_alloc_count in memory diff rows'
+                    }
+                }
+                if ($diffJson.data.Count -gt 0) {
+                    Assert-Descending -Items $diffJson.data -Property 'delta_bytes' -Context 'memory diff'
+                }
+            }
+            elseif ([string]::IsNullOrWhiteSpace([string]$diffJson.meta.warning)) {
+                throw 'Expected warning metadata when memory diff data_source is unavailable'
+            }
+
             $memoryAllocTopResult = Invoke-InsightCli -Args @($TracePath, 'memory', 'alloc-top', '--limit', '3', '--by', 'tag')
             if ($memoryAllocTopResult.ExitCode -ne 0) {
                 throw 'Expected zero exit code for memory alloc-top --by tag'

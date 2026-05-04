@@ -11,7 +11,7 @@ It reads `.utrace` / `.trace` inputs and returns machine-friendly JSON output fo
 - Threads and tasks: `threads waits`, `threads wait-chain`, `tasks top`, `tasks critical-path`
 - Asset loading diagnostics: `loadtime summary`, `loadtime packages`, `loadtime slowest`, `loadtime timeline`
 - GC diagnostics: `gc summary`, `gc events`, `gc longest`
-- Counters and memory: `counters list`, `counters series`, `counters stats`, `memory summary`, `memory peak`, `memory tags`, `memory alloc-top`, `memory leak-suspect`
+- Counters and memory: `counters list`, `counters series`, `counters stats`, `memory summary`, `memory peak`, `memory tags`, `memory diff`, `memory alloc-top`, `memory leak-suspect`
 - Marks and symbols: `marks search`, `marks around`, `symbols resolve`
 
 ## Quick Start
@@ -78,6 +78,9 @@ InsightCli.exe <trace_path> gc longest --limit 5
 # Memory allocation hotspots and leak suspects
 InsightCli.exe <trace_path> memory alloc-top --by tag --limit 10
 InsightCli.exe <trace_path> memory leak-suspect --window 5 --limit 10
+
+# Memory tag snapshot diff between two timestamps (seconds)
+InsightCli.exe <trace_path> memory diff --t1 0 --t2 5 --limit 10
 
 # Thread wait causality chain
 InsightCli.exe <trace_path> threads wait-chain --thread GameThread --depth 4 --time-start 0 --time-end 5000
