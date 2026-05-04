@@ -594,6 +594,33 @@ Options:
 Notes:
 - If Slate trace channel data is unavailable, this command falls back to CPU scope name pattern approximation and emits `meta.warning`.
 
+## 5.8.9 `anim top-actors`
+
+Purpose:
+- Return top actor buckets by animation-related CPU scope cost.
+
+Options:
+- `--limit <n>`: Maximum row count.
+
+## 5.8.10 `anim graph`
+
+Purpose:
+- Return animation graph node-level cost approximation for one actor filter.
+
+Options:
+- `--actor <name>`: Actor name fragment to match (required).
+
+## 5.8.11 `anim skinning`
+
+Purpose:
+- Return top skinning-related hotspots by CPU scope approximation.
+
+Options:
+- `--limit <n>`: Maximum row count.
+
+Notes:
+- When Animation channel data is unavailable, these commands fall back to CPU scope name pattern approximation and emit `meta.warning`.
+
 ## 5.9 `threads waits`
 
 Purpose:

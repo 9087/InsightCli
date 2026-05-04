@@ -504,6 +504,70 @@ function Invoke-NormalTraceSmoke {
                 throw 'Expected slate invalidation-rate warning metadata'
             }
         }),
+        (New-SmokeCase -Message "[$([IO.Path]::GetFileName($TracePath))] Verify anim top-actors returns ranked actor rows..." -Context 'anim top-actors' -Args @($TracePath, 'anim', 'top-actors', '--limit', '3') -MustContain @('"data"') -Validate {
+            param($result)
+            $json = Parse-JsonOutput -Text $result.Text -Context 'anim top-actors'
+            if ($null -eq $json.data) {
+                throw 'Expected anim top-actors response to include data array'
+            }
+            if ($json.data.Count -gt 3) {
+                throw 'Expected anim top-actors count <= limit'
+            }
+            if ($json.meta.data_source -ne 'cpu_scope_pattern') {
+                throw 'Expected anim top-actors meta.data_source=cpu_scope_pattern'
+            }
+            if ([string]::IsNullOrWhiteSpace([string]$json.meta.warning)) {
+                throw 'Expected anim top-actors fallback warning metadata'
+            }
+            foreach ($item in $json.data) {
+                if ([string]::IsNullOrWhiteSpace([string]$item.actor)) {
+                    throw 'Expected actor in anim top-actors rows'
+                }
+                if ($null -eq $item.anim_ms -or $null -eq $item.call_count) {
+                    throw 'Expected anim_ms and call_count in anim top-actors rows'
+                }
+            }
+        }),
+        (New-SmokeCase -Message "[$([IO.Path]::GetFileName($TracePath))] Verify anim graph requires actor and returns node metrics..." -Context 'anim graph' -Args @($TracePath, 'anim', 'graph', '--actor', 'Character') -MustContain @('"data"') -Validate {
+            param($result)
+            $json = Parse-JsonOutput -Text $result.Text -Context 'anim graph'
+            if ($null -eq $json.data) {
+                throw 'Expected anim graph response to include data array'
+            }
+            if ($json.meta.actor -ne 'Character') {
+                throw 'Expected anim graph meta.actor to echo actor filter'
+            }
+            if ($json.meta.data_source -ne 'cpu_scope_pattern') {
+                throw 'Expected anim graph meta.data_source=cpu_scope_pattern'
+            }
+            if ([string]::IsNullOrWhiteSpace([string]$json.meta.warning)) {
+                throw 'Expected anim graph fallback warning metadata'
+            }
+            foreach ($item in $json.data) {
+                if ([string]::IsNullOrWhiteSpace([string]$item.node)) {
+                    throw 'Expected node in anim graph rows'
+                }
+                if ($null -eq $item.total_ms -or $null -eq $item.call_count) {
+                    throw 'Expected total_ms and call_count in anim graph rows'
+                }
+            }
+        }),
+        (New-SmokeCase -Message "[$([IO.Path]::GetFileName($TracePath))] Verify anim skinning returns skinning hotspots..." -Context 'anim skinning' -Args @($TracePath, 'anim', 'skinning', '--limit', '3') -MustContain @('"data"') -Validate {
+            param($result)
+            $json = Parse-JsonOutput -Text $result.Text -Context 'anim skinning'
+            if ($null -eq $json.data) {
+                throw 'Expected anim skinning response to include data array'
+            }
+            if ($json.data.Count -gt 3) {
+                throw 'Expected anim skinning count <= limit'
+            }
+            if ($json.meta.data_source -ne 'cpu_scope_pattern') {
+                throw 'Expected anim skinning meta.data_source=cpu_scope_pattern'
+            }
+            if ([string]::IsNullOrWhiteSpace([string]$json.meta.warning)) {
+                throw 'Expected anim skinning fallback warning metadata'
+            }
+        }),
         (New-SmokeCase -Message "[$([IO.Path]::GetFileName($TracePath))] Verify threads waits returns trace-backed wait diagnostics..." -Context 'threads waits' -Args @($TracePath, 'threads', 'waits', '--frame-index', '1', '--limit', '3') -MustContain @('"data"', '"data_source"') -Validate {
             param($result)
             $json = Parse-JsonOutput -Text $result.Text -Context 'threads waits'

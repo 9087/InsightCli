@@ -592,6 +592,33 @@ InsightCli.exe C:/traces/run01.utrace rhi drawcalls --limit 5
 说明：
 - 当 Slate channel 不可用时，命令会回退到 CPU scope 名称模式近似，并在 `meta.warning` 标注。
 
+## 5.8.9 `anim top-actors`
+
+用途：
+- 返回按动画相关 CPU scope 开销聚合的 actor 热点。
+
+参数：
+- `--limit <n>`：返回记录数量上限。
+
+## 5.8.10 `anim graph`
+
+用途：
+- 返回指定 actor 过滤条件下的动画图节点耗时近似值。
+
+参数：
+- `--actor <name>`：用于匹配的 actor 名称片段（必填）。
+
+## 5.8.11 `anim skinning`
+
+用途：
+- 返回按 CPU scope 近似统计的 skinning 热点。
+
+参数：
+- `--limit <n>`：返回记录数量上限。
+
+说明：
+- 当 Animation channel 数据不可用时，这些命令会回退到 CPU scope 名称模式近似，并在 `meta.warning` 标注。
+
 ## 5.9 `threads waits`
 
 用途：
