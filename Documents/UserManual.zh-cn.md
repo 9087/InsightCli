@@ -19,6 +19,7 @@ InsightCli 是一个命令行工具，用于读取 Unreal trace 文件（`.utrac
 - `threads`
 - `tasks`
 - `io`
+- `net`
 - `loadtime`
 - `gc`
 - `symbols`
@@ -642,6 +643,39 @@ InsightCli.exe C:/traces/run01.utrace rhi drawcalls --limit 5
 
 参数：
 - `--limit <n>`：返回记录数量上限。
+
+## 5.8.15 `net summary`
+
+用途：
+- 返回网络活动汇总近似值（总 net scope 开销、RPC 调用近似、actor 覆盖度）。
+
+## 5.8.16 `net top-actors`
+
+用途：
+- 返回按网络相关 scope 开销聚合的 actor 热点。
+
+参数：
+- `--limit <n>`：返回记录数量上限。
+
+## 5.8.17 `net top-rpcs`
+
+用途：
+- 按总耗时返回 RPC-like scope 热点。
+
+参数：
+- `--limit <n>`：返回记录数量上限。
+
+## 5.8.18 `net bandwidth-series`
+
+用途：
+- 返回按帧对齐的带宽时间序列近似值。
+
+参数：
+- `--time-start <ms>`：时间窗口起点（包含）。
+- `--time-end <ms>`：时间窗口终点（不包含）。
+
+说明：
+- 当 Net channel 数据不可用时，这些命令会回退到 CPU scope 名称模式近似，并在 `meta.warning` 标注。
 
 ## 5.9 `threads waits`
 

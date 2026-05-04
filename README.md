@@ -11,6 +11,7 @@ It reads `.utrace` / `.trace` inputs and returns machine-friendly JSON output fo
 - Animation diagnostics: `anim top-actors`, `anim graph`, `anim skinning`
 - UI/Slate diagnostics: `slate top-widgets`, `slate paint-cost`, `slate invalidation-rate`
 - File I/O diagnostics: `io summary`, `io slowest-reads`, `io top-files`
+- Networking diagnostics: `net summary`, `net top-actors`, `net top-rpcs`, `net bandwidth-series`
 - Threads and tasks: `threads waits`, `threads wait-chain`, `tasks top`, `tasks critical-path`
 - Asset loading diagnostics: `loadtime summary`, `loadtime packages`, `loadtime slowest`, `loadtime timeline`
 - GC diagnostics: `gc summary`, `gc events`, `gc longest`
@@ -79,6 +80,12 @@ InsightCli.exe <trace_path> anim skinning --limit 10
 InsightCli.exe <trace_path> io summary
 InsightCli.exe <trace_path> io slowest-reads --limit 10
 InsightCli.exe <trace_path> io top-files --limit 10
+
+# Networking diagnostics
+InsightCli.exe <trace_path> net summary
+InsightCli.exe <trace_path> net top-actors --limit 10
+InsightCli.exe <trace_path> net top-rpcs --limit 10
+InsightCli.exe <trace_path> net bandwidth-series --time-start 0 --time-end 1000
 
 # Counter statistics
 InsightCli.exe <trace_path> counters stats --name ActorCount

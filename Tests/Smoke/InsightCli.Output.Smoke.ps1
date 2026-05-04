@@ -625,6 +625,72 @@ function Invoke-NormalTraceSmoke {
                 Assert-Descending -Items $json.data -Property 'read_bytes' -Context 'io top-files'
             }
         }),
+        (New-SmokeCase -Message "[$([IO.Path]::GetFileName($TracePath))] Verify net summary returns net approximation metrics..." -Context 'net summary' -Args @($TracePath, 'net', 'summary') -MustContain @('"data"') -Validate {
+            param($result)
+            $json = Parse-JsonOutput -Text $result.Text -Context 'net summary'
+            if ($null -eq $json.data) {
+                throw 'Expected net summary response to include data object'
+            }
+            foreach ($field in @('scope_sample_count', 'total_net_ms', 'approx_rpc_calls', 'approx_actor_count')) {
+                if ($null -eq $json.data.$field) {
+                    throw "Expected net summary field: $field"
+                }
+            }
+            if ($json.meta.data_source -ne 'cpu_scope_pattern') {
+                throw 'Expected net summary meta.data_source=cpu_scope_pattern'
+            }
+            if ([string]::IsNullOrWhiteSpace([string]$json.meta.warning)) {
+                throw 'Expected net summary fallback warning metadata'
+            }
+        }),
+        (New-SmokeCase -Message "[$([IO.Path]::GetFileName($TracePath))] Verify net top-actors supports limit..." -Context 'net top-actors' -Args @($TracePath, 'net', 'top-actors', '--limit', '3') -MustContain @('"data"') -Validate {
+            param($result)
+            $json = Parse-JsonOutput -Text $result.Text -Context 'net top-actors'
+            if ($null -eq $json.data) {
+                throw 'Expected net top-actors response to include data array'
+            }
+            if ($json.data.Count -gt 3) {
+                throw 'Expected net top-actors count <= limit'
+            }
+            if ($json.meta.data_source -ne 'cpu_scope_pattern') {
+                throw 'Expected net top-actors meta.data_source=cpu_scope_pattern'
+            }
+            if ([string]::IsNullOrWhiteSpace([string]$json.meta.warning)) {
+                throw 'Expected net top-actors fallback warning metadata'
+            }
+        }),
+        (New-SmokeCase -Message "[$([IO.Path]::GetFileName($TracePath))] Verify net top-rpcs returns ranked rpc rows..." -Context 'net top-rpcs' -Args @($TracePath, 'net', 'top-rpcs', '--limit', '3') -MustContain @('"data"') -Validate {
+            param($result)
+            $json = Parse-JsonOutput -Text $result.Text -Context 'net top-rpcs'
+            if ($null -eq $json.data) {
+                throw 'Expected net top-rpcs response to include data array'
+            }
+            if ($json.data.Count -gt 3) {
+                throw 'Expected net top-rpcs count <= limit'
+            }
+            if ($json.meta.data_source -ne 'cpu_scope_pattern') {
+                throw 'Expected net top-rpcs meta.data_source=cpu_scope_pattern'
+            }
+            if ([string]::IsNullOrWhiteSpace([string]$json.meta.warning)) {
+                throw 'Expected net top-rpcs fallback warning metadata'
+            }
+        }),
+        (New-SmokeCase -Message "[$([IO.Path]::GetFileName($TracePath))] Verify net bandwidth-series exposes warning fallback path..." -Context 'net bandwidth-series' -Args @($TracePath, 'net', 'bandwidth-series', '--time-start', '0', '--time-end', '1000') -MustContain @('"data"') -Validate {
+            param($result)
+            $json = Parse-JsonOutput -Text $result.Text -Context 'net bandwidth-series'
+            if ($null -eq $json.data) {
+                throw 'Expected net bandwidth-series response to include data array'
+            }
+            if ($json.meta.data_source -ne 'cpu_scope_pattern') {
+                throw 'Expected net bandwidth-series meta.data_source=cpu_scope_pattern'
+            }
+            if ([string]::IsNullOrWhiteSpace([string]$json.meta.warning)) {
+                throw 'Expected net bandwidth-series fallback warning metadata'
+            }
+            if ($json.meta.time_window_source -ne 'explicit') {
+                throw 'Expected net bandwidth-series explicit time window metadata'
+            }
+        }),
         (New-SmokeCase -Message "[$([IO.Path]::GetFileName($TracePath))] Verify threads waits returns trace-backed wait diagnostics..." -Context 'threads waits' -Args @($TracePath, 'threads', 'waits', '--frame-index', '1', '--limit', '3') -MustContain @('"data"', '"data_source"') -Validate {
             param($result)
             $json = Parse-JsonOutput -Text $result.Text -Context 'threads waits'

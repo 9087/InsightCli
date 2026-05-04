@@ -366,5 +366,6 @@ bool HandleMarksCommands(const FInsightCliRequest& Request, const FTraceContext&
 bool HandleLoadTimeCommands(const FInsightCliRequest& Request, const FTraceContext& Context, FInsightCliResponse& OutResponse);
 bool HandleGcCommands(const FInsightCliRequest& Request, const FTraceContext& Context, FInsightCliResponse& OutResponse);
 bool HandleIoCommands(const FInsightCliRequest& Request, const FTraceContext& Context, FInsightCliResponse& OutResponse);
+bool HandleNetCommands(const FInsightCliRequest& Request, const FTraceContext& Context, FInsightCliResponse& OutResponse);
 bool HandleDataCommands(const FInsightCliRequest& Request, const FTraceContext& Context, FInsightCliResponse& OutResponse);
 }

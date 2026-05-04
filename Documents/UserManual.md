@@ -19,6 +19,7 @@ Supported command groups:
 - `threads`
 - `tasks`
 - `io`
+- `net`
 - `loadtime`
 - `gc`
 - `symbols`
@@ -644,6 +645,39 @@ Purpose:
 
 Options:
 - `--limit <n>`: Maximum row count.
+
+## 5.8.15 `net summary`
+
+Purpose:
+- Return network activity summary approximation (total net scope cost, RPC call approximation, actor coverage).
+
+## 5.8.16 `net top-actors`
+
+Purpose:
+- Return top actor buckets by network-related scope cost.
+
+Options:
+- `--limit <n>`: Maximum row count.
+
+## 5.8.17 `net top-rpcs`
+
+Purpose:
+- Return top RPC-like scope rows by total time.
+
+Options:
+- `--limit <n>`: Maximum row count.
+
+## 5.8.18 `net bandwidth-series`
+
+Purpose:
+- Return frame-aligned bandwidth time series approximation.
+
+Options:
+- `--time-start <ms>`: Inclusive start timestamp.
+- `--time-end <ms>`: Exclusive end timestamp.
+
+Notes:
+- When Net channel data is unavailable, these commands fall back to CPU scope name pattern approximation and emit `meta.warning`.
 
 ## 5.9 `threads waits`
 
