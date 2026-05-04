@@ -14,8 +14,11 @@ Supported command groups:
 - `frames`
 - `cpu`
 - `gpu`
+- `anim`
+- `slate`
 - `threads`
 - `tasks`
+- `io`
 - `loadtime`
 - `gc`
 - `symbols`
@@ -620,6 +623,27 @@ Options:
 
 Notes:
 - When Animation channel data is unavailable, these commands fall back to CPU scope name pattern approximation and emit `meta.warning`.
+
+## 5.8.12 `io summary`
+
+Purpose:
+- Return total read bytes, read count, and sync/async split from FileActivity traces.
+
+## 5.8.13 `io slowest-reads`
+
+Purpose:
+- Return slowest read operations ordered by read duration.
+
+Options:
+- `--limit <n>`: Maximum row count.
+
+## 5.8.14 `io top-files`
+
+Purpose:
+- Return top files by aggregated read bytes.
+
+Options:
+- `--limit <n>`: Maximum row count.
 
 ## 5.9 `threads waits`
 

@@ -14,8 +14,11 @@ InsightCli 是一个命令行工具，用于读取 Unreal trace 文件（`.utrac
 - `frames`
 - `cpu`
 - `gpu`
+- `anim`
+- `slate`
 - `threads`
 - `tasks`
+- `io`
 - `loadtime`
 - `gc`
 - `symbols`
@@ -618,6 +621,27 @@ InsightCli.exe C:/traces/run01.utrace rhi drawcalls --limit 5
 
 说明：
 - 当 Animation channel 数据不可用时，这些命令会回退到 CPU scope 名称模式近似，并在 `meta.warning` 标注。
+
+## 5.8.12 `io summary`
+
+用途：
+- 返回 FileActivity 读操作总字节、读次数，以及同步/异步占比。
+
+## 5.8.13 `io slowest-reads`
+
+用途：
+- 按读耗时降序返回最慢读操作。
+
+参数：
+- `--limit <n>`：返回记录数量上限。
+
+## 5.8.14 `io top-files`
+
+用途：
+- 按聚合读字节返回热点文件。
+
+参数：
+- `--limit <n>`：返回记录数量上限。
 
 ## 5.9 `threads waits`
 

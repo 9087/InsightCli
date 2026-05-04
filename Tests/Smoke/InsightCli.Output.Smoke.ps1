@@ -568,6 +568,63 @@ function Invoke-NormalTraceSmoke {
                 throw 'Expected anim skinning fallback warning metadata'
             }
         }),
+        (New-SmokeCase -Message "[$([IO.Path]::GetFileName($TracePath))] Verify io summary returns read totals and sync/async split..." -Context 'io summary' -Args @($TracePath, 'io', 'summary') -MustContain @('"data"') -Validate {
+            param($result)
+            $json = Parse-JsonOutput -Text $result.Text -Context 'io summary'
+            if ($null -eq $json.data) {
+                throw 'Expected io summary response to include data object'
+            }
+            foreach ($field in @('read_count', 'total_read_bytes', 'sync_read_count', 'async_read_count', 'sync_read_ratio', 'async_read_ratio')) {
+                if ($null -eq $json.data.$field) {
+                    throw "Expected io summary field: $field"
+                }
+            }
+            if ([string]::IsNullOrWhiteSpace([string]$json.meta.channel_state)) {
+                throw 'Expected io summary meta.channel_state'
+            }
+        }),
+        (New-SmokeCase -Message "[$([IO.Path]::GetFileName($TracePath))] Verify io slowest-reads respects limit and sort order..." -Context 'io slowest-reads' -Args @($TracePath, 'io', 'slowest-reads', '--limit', '3') -MustContain @('"data"') -Validate {
+            param($result)
+            $json = Parse-JsonOutput -Text $result.Text -Context 'io slowest-reads'
+            if ($null -eq $json.data) {
+                throw 'Expected io slowest-reads response to include data array'
+            }
+            if ($json.data.Count -gt 3) {
+                throw 'Expected io slowest-reads count <= limit'
+            }
+            foreach ($item in $json.data) {
+                if ([string]::IsNullOrWhiteSpace([string]$item.file_path)) {
+                    throw 'Expected file_path in io slowest-reads rows'
+                }
+                if ($null -eq $item.duration_ms -or $null -eq $item.actual_size_bytes) {
+                    throw 'Expected duration_ms and actual_size_bytes in io slowest-reads rows'
+                }
+            }
+            if ($json.data.Count -gt 0) {
+                Assert-Descending -Items $json.data -Property 'duration_ms' -Context 'io slowest-reads'
+            }
+        }),
+        (New-SmokeCase -Message "[$([IO.Path]::GetFileName($TracePath))] Verify io top-files aggregates file hotspots..." -Context 'io top-files' -Args @($TracePath, 'io', 'top-files', '--limit', '3') -MustContain @('"data"') -Validate {
+            param($result)
+            $json = Parse-JsonOutput -Text $result.Text -Context 'io top-files'
+            if ($null -eq $json.data) {
+                throw 'Expected io top-files response to include data array'
+            }
+            if ($json.data.Count -gt 3) {
+                throw 'Expected io top-files count <= limit'
+            }
+            foreach ($item in $json.data) {
+                if ([string]::IsNullOrWhiteSpace([string]$item.file_path)) {
+                    throw 'Expected file_path in io top-files rows'
+                }
+                if ($null -eq $item.read_count -or $null -eq $item.read_bytes) {
+                    throw 'Expected read_count and read_bytes in io top-files rows'
+                }
+            }
+            if ($json.data.Count -gt 0) {
+                Assert-Descending -Items $json.data -Property 'read_bytes' -Context 'io top-files'
+            }
+        }),
         (New-SmokeCase -Message "[$([IO.Path]::GetFileName($TracePath))] Verify threads waits returns trace-backed wait diagnostics..." -Context 'threads waits' -Args @($TracePath, 'threads', 'waits', '--frame-index', '1', '--limit', '3') -MustContain @('"data"', '"data_source"') -Validate {
             param($result)
             $json = Parse-JsonOutput -Text $result.Text -Context 'threads waits'

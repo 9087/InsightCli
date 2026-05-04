@@ -10,6 +10,7 @@ It reads `.utrace` / `.trace` inputs and returns machine-friendly JSON output fo
 - CPU/GPU/RHI hotspots: `cpu top`, `cpu stack`, `cpu hot-functions`, `gpu top`, `gpu passes`, `gpu pass-detail`, `rhi summary`, `rhi drawcalls`, `rhi top-materials`, `rhi top-meshes`
 - Animation diagnostics: `anim top-actors`, `anim graph`, `anim skinning`
 - UI/Slate diagnostics: `slate top-widgets`, `slate paint-cost`, `slate invalidation-rate`
+- File I/O diagnostics: `io summary`, `io slowest-reads`, `io top-files`
 - Threads and tasks: `threads waits`, `threads wait-chain`, `tasks top`, `tasks critical-path`
 - Asset loading diagnostics: `loadtime summary`, `loadtime packages`, `loadtime slowest`, `loadtime timeline`
 - GC diagnostics: `gc summary`, `gc events`, `gc longest`
@@ -73,6 +74,11 @@ InsightCli.exe <trace_path> slate invalidation-rate --time-start 0 --time-end 10
 InsightCli.exe <trace_path> anim top-actors --limit 10
 InsightCli.exe <trace_path> anim graph --actor Character
 InsightCli.exe <trace_path> anim skinning --limit 10
+
+# File I/O diagnostics
+InsightCli.exe <trace_path> io summary
+InsightCli.exe <trace_path> io slowest-reads --limit 10
+InsightCli.exe <trace_path> io top-files --limit 10
 
 # Counter statistics
 InsightCli.exe <trace_path> counters stats --name ActorCount
