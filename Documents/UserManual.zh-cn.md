@@ -387,6 +387,48 @@ InsightCli.exe C:/traces/run01.utrace gpu pass-detail --frame-index 120 --pass B
 }
 ```
 
+## 5.8.1 `gpu passes`
+
+用途：
+- 枚举单帧内的 GPU pass，或在时间窗口内汇总 pass 开销。
+
+参数：
+- `--frame-index <n>`：目标帧索引（从 0 开始）。
+- `--time-start <ms>`：时间窗口起点（毫秒，包含）。
+- `--time-end <ms>`：时间窗口终点（毫秒，不包含）。
+
+说明：
+- `--frame-index` 不能与 `--time-start/--time-end` 同时使用。
+
+示例：
+
+```powershell
+InsightCli.exe C:/traces/run01.utrace gpu passes --frame-index 120
+```
+
+示例输出：
+
+```json
+{
+  "data": [
+    {
+      "pass": "BasePass",
+      "gpu_ms": 4.22,
+      "draw_call_count": 240
+    },
+    {
+      "pass": "ShadowDepths",
+      "gpu_ms": 2.18,
+      "draw_call_count": 128
+    }
+  ],
+  "meta": {
+    "frame_index": "120",
+    "data_source": "trace"
+  }
+}
+```
+
 ## 5.9 `threads waits`
 
 用途：

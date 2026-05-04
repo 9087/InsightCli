@@ -320,6 +320,35 @@ function Invoke-NormalTraceSmoke {
                 Assert-Descending -Items $json.data -Property 'total_ms' -Context 'gpu top'
             }
         }),
+        (New-SmokeCase -Message "[$([IO.Path]::GetFileName($TracePath))] Verify gpu passes enumerates frame pass list..." -Context 'gpu passes' -Args @($TracePath, 'gpu', 'passes', '--frame-index', '120') -MustContain @('"data"', '"data_source"') -Validate {
+            param($result)
+            $json = Parse-JsonOutput -Text $result.Text -Context 'gpu passes'
+            if ($null -eq $json.data) {
+                throw 'Expected gpu passes response to include data array'
+            }
+            if ($json.meta.data_source -ne 'trace') {
+                throw 'Expected gpu passes meta.data_source=trace'
+            }
+            if ($json.meta.frame_index -ne '120') {
+                throw 'Expected gpu passes meta.frame_index=120'
+            }
+
+            if ($json.data.Count -gt 0) {
+                foreach ($item in $json.data) {
+                    if ($null -eq $item.pass -or [string]::IsNullOrWhiteSpace([string]$item.pass)) {
+                        throw 'Expected pass in gpu passes rows'
+                    }
+                    if ($null -eq $item.gpu_ms) {
+                        throw 'Expected gpu_ms in gpu passes rows'
+                    }
+                    if ($null -eq $item.draw_call_count) {
+                        throw 'Expected draw_call_count in gpu passes rows'
+                    }
+                }
+
+                Assert-Descending -Items $json.data -Property 'gpu_ms' -Context 'gpu passes'
+            }
+        }),
         (New-SmokeCase -Message "[$([IO.Path]::GetFileName($TracePath))] Verify threads waits returns trace-backed wait diagnostics..." -Context 'threads waits' -Args @($TracePath, 'threads', 'waits', '--frame-index', '1', '--limit', '3') -MustContain @('"data"', '"data_source"') -Validate {
             param($result)
             $json = Parse-JsonOutput -Text $result.Text -Context 'threads waits'

@@ -258,6 +258,7 @@ bool BuildGpuTopSamples(
 	TOptional<double> IntervalStartSec = {},
 	TOptional<double> IntervalEndSec = {});
 TSharedRef<FJsonObject> MakeGpuTopObject(const FGpuScopeSample& Sample);
+TSharedRef<FJsonObject> MakeGpuPassesObject(const FGpuScopeSample& Sample);
 TSharedRef<FJsonObject> MakeGpuPassDetailObject(const FFrameSample& FrameSample, const FGpuScopeSample& Sample);
 
 // JSON/data builders: threads + tasks

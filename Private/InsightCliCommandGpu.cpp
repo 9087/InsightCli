@@ -119,6 +119,15 @@ TSharedRef<FJsonObject> MakeGpuTopObject(const FGpuScopeSample& Sample)
 	return Item;
 }
 
+TSharedRef<FJsonObject> MakeGpuPassesObject(const FGpuScopeSample& Sample)
+{
+	const TSharedRef<FJsonObject> Item = MakeShared<FJsonObject>();
+	Item->SetStringField(TEXT("pass"), Sample.ScopeName);
+	Item->SetNumberField(TEXT("gpu_ms"), Sample.TotalMs);
+	Item->SetNumberField(TEXT("draw_call_count"), Sample.CallCount);
+	return Item;
+}
+
 TSharedRef<FJsonObject> MakeGpuPassDetailObject(const FFrameSample& FrameSample, const FGpuScopeSample& Sample)
 {
 	const TSharedRef<FJsonObject> Item = MakeShared<FJsonObject>();

@@ -387,6 +387,48 @@ Sample output:
 }
 ```
 
+## 5.8.1 `gpu passes`
+
+Purpose:
+- Enumerate GPU passes in one frame, or aggregate pass cost in a time window.
+
+Options:
+- `--frame-index <n>`: Target frame index (zero-based).
+- `--time-start <ms>`: Inclusive start timestamp in milliseconds.
+- `--time-end <ms>`: Exclusive end timestamp in milliseconds.
+
+Notes:
+- `--frame-index` cannot be combined with `--time-start/--time-end`.
+
+Example:
+
+```powershell
+InsightCli.exe C:/traces/run01.utrace gpu passes --frame-index 120
+```
+
+Sample output:
+
+```json
+{
+  "data": [
+    {
+      "pass": "BasePass",
+      "gpu_ms": 4.22,
+      "draw_call_count": 240
+    },
+    {
+      "pass": "ShadowDepths",
+      "gpu_ms": 2.18,
+      "draw_call_count": 128
+    }
+  ],
+  "meta": {
+    "frame_index": "120",
+    "data_source": "trace"
+  }
+}
+```
+
 ## 5.9 `threads waits`
 
 Purpose:
