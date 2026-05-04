@@ -22,6 +22,7 @@ InsightCli 是一个命令行工具，用于读取 Unreal trace 文件（`.utrac
 - `tasks`
 - `io`
 - `net`
+- `shaders`
 - `loadtime`
 - `gc`
 - `symbols`
@@ -721,6 +722,22 @@ InsightCli.exe C:/traces/run01.utrace rhi drawcalls --limit 5
 
 说明：
 - 当 Physics channel 数据不可用时，这些命令会回退到 CPU scope 名称模式近似，并在 `meta.warning` 标注。
+
+## 5.8.24 `shaders compile-events`
+
+用途：
+- 返回按近似耗时排序的 shader/PSO 编译类事件。
+
+参数：
+- `--limit <n>`：返回记录数量上限。
+
+## 5.8.25 `shaders pso-cache-misses`
+
+用途：
+- 返回 PSO cache miss 近似汇总与编译开销。
+
+说明：
+- 当 Shader/PSO channel 数据不可用时，这些命令会回退到 CPU scope 名称模式近似，并在 `meta.warning` 标注。
 
 ## 5.9 `threads waits`
 

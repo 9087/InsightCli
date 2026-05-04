@@ -770,6 +770,40 @@ function Invoke-NormalTraceSmoke {
                 throw 'Expected physics top-bodies fallback warning metadata'
             }
         }),
+        (New-SmokeCase -Message "[$([IO.Path]::GetFileName($TracePath))] Verify shaders compile-events returns sorted rows..." -Context 'shaders compile-events' -Args @($TracePath, 'shaders', 'compile-events', '--limit', '3') -MustContain @('"data"') -Validate {
+            param($result)
+            $json = Parse-JsonOutput -Text $result.Text -Context 'shaders compile-events'
+            if ($null -eq $json.data) {
+                throw 'Expected shaders compile-events response to include data array'
+            }
+            if ($json.data.Count -gt 3) {
+                throw 'Expected shaders compile-events count <= limit'
+            }
+            if ($json.meta.data_source -ne 'cpu_scope_pattern') {
+                throw 'Expected shaders compile-events meta.data_source=cpu_scope_pattern'
+            }
+            if ([string]::IsNullOrWhiteSpace([string]$json.meta.warning)) {
+                throw 'Expected shaders compile-events fallback warning metadata'
+            }
+        }),
+        (New-SmokeCase -Message "[$([IO.Path]::GetFileName($TracePath))] Verify shaders pso-cache-misses returns summary metrics..." -Context 'shaders pso-cache-misses' -Args @($TracePath, 'shaders', 'pso-cache-misses') -MustContain @('"data"') -Validate {
+            param($result)
+            $json = Parse-JsonOutput -Text $result.Text -Context 'shaders pso-cache-misses'
+            if ($null -eq $json.data) {
+                throw 'Expected shaders pso-cache-misses response to include data object'
+            }
+            foreach ($field in @('miss_scope_count', 'compile_cost_ms', 'top_scope')) {
+                if ($null -eq $json.data.$field) {
+                    throw "Expected shaders pso-cache-misses field: $field"
+                }
+            }
+            if ($json.meta.data_source -ne 'cpu_scope_pattern') {
+                throw 'Expected shaders pso-cache-misses meta.data_source=cpu_scope_pattern'
+            }
+            if ([string]::IsNullOrWhiteSpace([string]$json.meta.warning)) {
+                throw 'Expected shaders pso-cache-misses fallback warning metadata'
+            }
+        }),
         (New-SmokeCase -Message "[$([IO.Path]::GetFileName($TracePath))] Verify threads waits returns trace-backed wait diagnostics..." -Context 'threads waits' -Args @($TracePath, 'threads', 'waits', '--frame-index', '1', '--limit', '3') -MustContain @('"data"', '"data_source"') -Validate {
             param($result)
             $json = Parse-JsonOutput -Text $result.Text -Context 'threads waits'

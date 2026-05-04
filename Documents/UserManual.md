@@ -22,6 +22,7 @@ Supported command groups:
 - `tasks`
 - `io`
 - `net`
+- `shaders`
 - `loadtime`
 - `gc`
 - `symbols`
@@ -723,6 +724,22 @@ Options:
 
 Notes:
 - When Physics channel data is unavailable, these commands fall back to CPU scope name pattern approximation and emit `meta.warning`.
+
+## 5.8.24 `shaders compile-events`
+
+Purpose:
+- Return shader/PSO compile-like events ordered by approximated cost.
+
+Options:
+- `--limit <n>`: Maximum row count.
+
+## 5.8.25 `shaders pso-cache-misses`
+
+Purpose:
+- Return approximated PSO cache miss summary and compile cost.
+
+Notes:
+- When Shader/PSO channel data is unavailable, these commands fall back to CPU scope name pattern approximation and emit `meta.warning`.
 
 ## 5.9 `threads waits`
 

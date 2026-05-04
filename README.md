@@ -14,6 +14,7 @@ It reads `.utrace` / `.trace` inputs and returns machine-friendly JSON output fo
 - Networking diagnostics: `net summary`, `net top-actors`, `net top-rpcs`, `net bandwidth-series`
 - Niagara diagnostics: `niagara top-systems`, `niagara emitter-cost`
 - Physics diagnostics: `physics summary`, `physics solver-stages`, `physics top-bodies`
+- Shader/PSO diagnostics: `shaders compile-events`, `shaders pso-cache-misses`
 - Threads and tasks: `threads waits`, `threads wait-chain`, `tasks top`, `tasks critical-path`
 - Asset loading diagnostics: `loadtime summary`, `loadtime packages`, `loadtime slowest`, `loadtime timeline`
 - GC diagnostics: `gc summary`, `gc events`, `gc longest`
@@ -97,6 +98,10 @@ InsightCli.exe <trace_path> niagara emitter-cost --system NiagaraSystem
 InsightCli.exe <trace_path> physics summary --frame-index 120
 InsightCli.exe <trace_path> physics solver-stages
 InsightCli.exe <trace_path> physics top-bodies --limit 10
+
+# Shader/PSO diagnostics
+InsightCli.exe <trace_path> shaders compile-events --limit 10
+InsightCli.exe <trace_path> shaders pso-cache-misses
 
 # Counter statistics
 InsightCli.exe <trace_path> counters stats --name ActorCount

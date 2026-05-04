@@ -54,6 +54,8 @@ constexpr FCommandCatalogEntry CommandCatalog[] =
 	{ TEXT("net"), TEXT("top-actors"), &HandleDataCommands },
 	{ TEXT("net"), TEXT("top-rpcs"), &HandleDataCommands },
 	{ TEXT("net"), TEXT("bandwidth-series"), &HandleDataCommands },
+	{ TEXT("shaders"), TEXT("compile-events"), &HandleDataCommands },
+	{ TEXT("shaders"), TEXT("pso-cache-misses"), &HandleDataCommands },
 	{ TEXT("io"), TEXT("summary"), &HandleDataCommands },
 	{ TEXT("io"), TEXT("slowest-reads"), &HandleDataCommands },
 	{ TEXT("io"), TEXT("top-files"), &HandleDataCommands },

@@ -8,7 +8,7 @@ namespace
 {
 using FHandlerFn = bool (*)(const FInsightCliRequest&, const FTraceContext&, FInsightCliResponse&);
 
-constexpr int32 ExpectedDataHandlerCount = 8;
+constexpr int32 ExpectedDataHandlerCount = 9;
 constexpr FHandlerFn DataHandlers[] =
 {
 	&HandleSymbolsCommands,
@@ -19,6 +19,7 @@ constexpr FHandlerFn DataHandlers[] =
 	&HandleGcCommands,
 	&HandleIoCommands,
 	&HandleNetCommands,
+	&HandleShadersCommands,
 };
 
 static_assert(UE_ARRAY_COUNT(DataHandlers) == ExpectedDataHandlerCount, "Update data handler mapping when adding/removing data subcommands.");

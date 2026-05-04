@@ -369,5 +369,6 @@ bool HandleLoadTimeCommands(const FInsightCliRequest& Request, const FTraceConte
 bool HandleGcCommands(const FInsightCliRequest& Request, const FTraceContext& Context, FInsightCliResponse& OutResponse);
 bool HandleIoCommands(const FInsightCliRequest& Request, const FTraceContext& Context, FInsightCliResponse& OutResponse);
 bool HandleNetCommands(const FInsightCliRequest& Request, const FTraceContext& Context, FInsightCliResponse& OutResponse);
+bool HandleShadersCommands(const FInsightCliRequest& Request, const FTraceContext& Context, FInsightCliResponse& OutResponse);
 bool HandleDataCommands(const FInsightCliRequest& Request, const FTraceContext& Context, FInsightCliResponse& OutResponse);
 }
