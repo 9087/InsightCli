@@ -685,6 +685,59 @@ function Invoke-NormalTraceSmoke {
                     throw 'Expected bytes and percent_ratio in memory tags rows'
                 }
             }
+
+            $memoryAllocTopResult = Invoke-InsightCli -Args @($TracePath, 'memory', 'alloc-top', '--limit', '3', '--by', 'tag')
+            if ($memoryAllocTopResult.ExitCode -ne 0) {
+                throw 'Expected zero exit code for memory alloc-top --by tag'
+            }
+            $allocTopJson = Parse-JsonOutput -Text $memoryAllocTopResult.Text -Context 'memory alloc-top'
+            if ($allocTopJson.meta.by -ne 'tag') {
+                throw 'Expected memory alloc-top meta.by=tag'
+            }
+            if ($allocTopJson.data.Count -gt 3) {
+                throw 'Expected memory alloc-top count <= limit'
+            }
+            if ($allocTopJson.meta.data_source -eq 'trace') {
+                foreach ($item in $allocTopJson.data) {
+                    if ([string]::IsNullOrWhiteSpace([string]$item.tag_name)) {
+                        throw 'Expected tag_name in memory alloc-top rows'
+                    }
+                    if ($null -eq $item.bytes -or $null -eq $item.sample_count) {
+                        throw 'Expected bytes and sample_count in memory alloc-top rows'
+                    }
+                }
+                if ($allocTopJson.data.Count -gt 0) {
+                    Assert-Descending -Items $allocTopJson.data -Property 'bytes' -Context 'memory alloc-top'
+                }
+            }
+            elseif ([string]::IsNullOrWhiteSpace([string]$allocTopJson.meta.warning)) {
+                throw 'Expected warning metadata when memory alloc-top data_source is unavailable'
+            }
+
+            $memoryLeakResult = Invoke-InsightCli -Args @($TracePath, 'memory', 'leak-suspect', '--window', '5', '--limit', '3')
+            if ($memoryLeakResult.ExitCode -ne 0) {
+                throw 'Expected zero exit code for memory leak-suspect'
+            }
+            $leakJson = Parse-JsonOutput -Text $memoryLeakResult.Text -Context 'memory leak-suspect'
+            if ($leakJson.data.Count -gt 3) {
+                throw 'Expected memory leak-suspect count <= limit'
+            }
+            if ($leakJson.meta.data_source -eq 'trace') {
+                foreach ($item in $leakJson.data) {
+                    if ([string]::IsNullOrWhiteSpace([string]$item.tag_name)) {
+                        throw 'Expected tag_name in memory leak-suspect rows'
+                    }
+                    if ($null -eq $item.growth_bytes -or $null -eq $item.sample_count) {
+                        throw 'Expected growth_bytes and sample_count in memory leak-suspect rows'
+                    }
+                }
+                if ($leakJson.data.Count -gt 0) {
+                    Assert-Descending -Items $leakJson.data -Property 'growth_bytes' -Context 'memory leak-suspect'
+                }
+            }
+            elseif ([string]::IsNullOrWhiteSpace([string]$leakJson.meta.warning)) {
+                throw 'Expected warning metadata when memory leak-suspect data_source is unavailable'
+            }
         }),
         (New-SmokeCase -Message "[$([IO.Path]::GetFileName($TracePath))] Verify marks search/around return mark data..." -Context 'marks search/around' -Args @($TracePath, 'marks', 'search', '--keyword', 'load') -MustContain @('"data"') -Validate {
             param($result)

@@ -779,7 +779,71 @@ Sample output:
 }
 ```
 
-## 5.19 `marks search`
+## 5.19 `memory alloc-top`
+
+Purpose:
+- Return top memory allocation owners.
+
+Options:
+- `--limit <n>`: Maximum number of rows returned.
+- `--by <tag|callstack>`: Group mode; default is `tag`.
+
+Example:
+
+```powershell
+InsightCli.exe C:/traces/run01.utrace memory alloc-top --by tag --limit 5
+```
+
+Sample output:
+
+```json
+{
+  "data": [
+    { "tag_name": "Textures", "bytes": 948746658, "sample_count": 64 },
+    { "tag_name": "Meshes", "bytes": 740289772, "sample_count": 64 }
+  ],
+  "meta": {
+    "data_source": "trace",
+    "by": "tag",
+    "limit": "5"
+  }
+}
+```
+
+Notes:
+- `--by callstack` currently returns an empty `data` array with `meta.warning`.
+
+## 5.20 `memory leak-suspect`
+
+Purpose:
+- Identify tags whose memory grows in the recent trailing window.
+
+Options:
+- `--window <sec>` (required): Trailing time window in seconds.
+- `--limit <n>`: Maximum number of rows returned.
+
+Example:
+
+```powershell
+InsightCli.exe C:/traces/run01.utrace memory leak-suspect --window 5 --limit 5
+```
+
+Sample output:
+
+```json
+{
+  "data": [
+    { "tag_name": "Streaming", "growth_bytes": 52428800, "sample_count": 12, "start_bytes": 104857600, "end_bytes": 157286400 }
+  ],
+  "meta": {
+    "data_source": "trace",
+    "window_sec": "5.000",
+    "limit": "5"
+  }
+}
+```
+
+## 5.21 `marks search`
 
 Purpose:
 - Search bookmark/log messages by keyword with optional filters.
@@ -826,7 +890,7 @@ Sample output:
 }
 ```
 
-## 5.20 `marks around`
+## 5.22 `marks around`
 
 Purpose:
 - Return marks around a timestamp window.

@@ -39,6 +39,8 @@ constexpr FCommandCatalogEntry CommandCatalog[] =
 	{ TEXT("memory"), TEXT("peak"), &HandleDataCommands },
 	{ TEXT("memory"), TEXT("series"), &HandleDataCommands },
 	{ TEXT("memory"), TEXT("tags"), &HandleDataCommands },
+	{ TEXT("memory"), TEXT("alloc-top"), &HandleDataCommands },
+	{ TEXT("memory"), TEXT("leak-suspect"), &HandleDataCommands },
 	{ TEXT("marks"), TEXT("search"), &HandleDataCommands },
 	{ TEXT("marks"), TEXT("around"), &HandleDataCommands },
 	{ TEXT("loadtime"), TEXT("summary"), &HandleDataCommands },

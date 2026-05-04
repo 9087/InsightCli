@@ -779,7 +779,71 @@ InsightCli.exe C:/traces/run01.utrace memory tags --limit 3
 }
 ```
 
-## 5.19 `marks search`
+## 5.19 `memory alloc-top`
+
+用途：
+- 返回内存分配热点（Top N）。
+
+参数：
+- `--limit <n>`：返回记录数量上限。
+- `--by <tag|callstack>`：分组方式，默认 `tag`。
+
+示例：
+
+```powershell
+InsightCli.exe C:/traces/run01.utrace memory alloc-top --by tag --limit 5
+```
+
+示例输出：
+
+```json
+{
+  "data": [
+    { "tag_name": "Textures", "bytes": 948746658, "sample_count": 64 },
+    { "tag_name": "Meshes", "bytes": 740289772, "sample_count": 64 }
+  ],
+  "meta": {
+    "data_source": "trace",
+    "by": "tag",
+    "limit": "5"
+  }
+}
+```
+
+说明：
+- `--by callstack` 当前会返回空 `data`，并在 `meta.warning` 中提示原因。
+
+## 5.20 `memory leak-suspect`
+
+用途：
+- 在最近时间窗口内识别持续增长的内存标签。
+
+参数：
+- `--window <sec>`（必填）：回溯窗口（秒）。
+- `--limit <n>`：返回记录数量上限。
+
+示例：
+
+```powershell
+InsightCli.exe C:/traces/run01.utrace memory leak-suspect --window 5 --limit 5
+```
+
+示例输出：
+
+```json
+{
+  "data": [
+    { "tag_name": "Streaming", "growth_bytes": 52428800, "sample_count": 12, "start_bytes": 104857600, "end_bytes": 157286400 }
+  ],
+  "meta": {
+    "data_source": "trace",
+    "window_sec": "5.000",
+    "limit": "5"
+  }
+}
+```
+
+## 5.21 `marks search`
 
 用途：
 - 按关键字检索 bookmark/log 事件，支持组合过滤。
@@ -826,7 +890,7 @@ InsightCli.exe C:/traces/run01.utrace marks search --keyword load --category log
 }
 ```
 
-## 5.20 `marks around`
+## 5.22 `marks around`
 
 用途：
 - 返回某时间点附近窗口内的 marks。

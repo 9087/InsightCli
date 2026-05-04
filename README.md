@@ -11,7 +11,7 @@ It reads `.utrace` / `.trace` inputs and returns machine-friendly JSON output fo
 - Threads and tasks: `threads waits`, `tasks top`
 - Asset loading diagnostics: `loadtime summary`, `loadtime packages`, `loadtime slowest`, `loadtime timeline`
 - GC diagnostics: `gc summary`, `gc events`, `gc longest`
-- Counters and memory: `counters list`, `counters series`, `counters stats`, `memory summary`, `memory peak`, `memory tags`
+- Counters and memory: `counters list`, `counters series`, `counters stats`, `memory summary`, `memory peak`, `memory tags`, `memory alloc-top`, `memory leak-suspect`
 - Marks and symbols: `marks search`, `marks around`, `symbols resolve`
 
 ## Quick Start
@@ -65,6 +65,10 @@ InsightCli.exe <trace_path> loadtime timeline --time-start 0 --time-end 5000
 # GC event summary and longest events
 InsightCli.exe <trace_path> gc summary
 InsightCli.exe <trace_path> gc longest --limit 5
+
+# Memory allocation hotspots and leak suspects
+InsightCli.exe <trace_path> memory alloc-top --by tag --limit 10
+InsightCli.exe <trace_path> memory leak-suspect --window 5 --limit 10
 
 # List enabled/known trace channels
 InsightCli.exe <trace_path> info channels
@@ -146,3 +150,4 @@ powershell -ExecutionPolicy Bypass -File Engine/Source/Programs/InsightCli/Tools
 - Treat CLI output as structured data first (JSON parsing) rather than plain text.
 - Startup performance is currently considered good enough; use the perf compare script for periodic regression checks instead of continuous micro-optimization.
 - GC results are inferred from CPU scope name patterns (`meta.source=cpu_scope_pattern`), so pattern coverage may vary by engine version.
+- `memory alloc-top --by callstack` currently returns an empty data set with `meta.warning`; use `--by tag` for actionable results.
