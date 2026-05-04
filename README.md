@@ -12,6 +12,7 @@ It reads `.utrace` / `.trace` inputs and returns machine-friendly JSON output fo
 - UI/Slate diagnostics: `slate top-widgets`, `slate paint-cost`, `slate invalidation-rate`
 - File I/O diagnostics: `io summary`, `io slowest-reads`, `io top-files`
 - Networking diagnostics: `net summary`, `net top-actors`, `net top-rpcs`, `net bandwidth-series`
+- Niagara diagnostics: `niagara top-systems`, `niagara emitter-cost`
 - Threads and tasks: `threads waits`, `threads wait-chain`, `tasks top`, `tasks critical-path`
 - Asset loading diagnostics: `loadtime summary`, `loadtime packages`, `loadtime slowest`, `loadtime timeline`
 - GC diagnostics: `gc summary`, `gc events`, `gc longest`
@@ -86,6 +87,10 @@ InsightCli.exe <trace_path> net summary
 InsightCli.exe <trace_path> net top-actors --limit 10
 InsightCli.exe <trace_path> net top-rpcs --limit 10
 InsightCli.exe <trace_path> net bandwidth-series --time-start 0 --time-end 1000
+
+# Niagara diagnostics
+InsightCli.exe <trace_path> niagara top-systems --limit 10
+InsightCli.exe <trace_path> niagara emitter-cost --system NiagaraSystem
 
 # Counter statistics
 InsightCli.exe <trace_path> counters stats --name ActorCount

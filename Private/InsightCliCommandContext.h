@@ -353,6 +353,7 @@ bool HandleInfoAndFramesCommands(const FInsightCliRequest& Request, const FTrace
 bool HandleCpuCommands(const FInsightCliRequest& Request, const FTraceContext& Context, FInsightCliResponse& OutResponse);
 bool HandleGpuCommands(const FInsightCliRequest& Request, const FTraceContext& Context, FInsightCliResponse& OutResponse);
 bool HandleAnimCommands(const FInsightCliRequest& Request, const FTraceContext& Context, FInsightCliResponse& OutResponse);
+bool HandleNiagaraCommands(const FInsightCliRequest& Request, const FTraceContext& Context, FInsightCliResponse& OutResponse);
 bool HandleSlateCommands(const FInsightCliRequest& Request, const FTraceContext& Context, FInsightCliResponse& OutResponse);
 bool HandleThreadsCommands(const FInsightCliRequest& Request, const FTraceContext& Context, FInsightCliResponse& OutResponse);
 bool HandleTasksCommands(const FInsightCliRequest& Request, const FTraceContext& Context, FInsightCliResponse& OutResponse);

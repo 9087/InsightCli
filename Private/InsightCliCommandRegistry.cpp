@@ -38,6 +38,8 @@ constexpr FCommandCatalogEntry CommandCatalog[] =
 	{ TEXT("anim"), TEXT("top-actors"), &HandlePerformanceCommands },
 	{ TEXT("anim"), TEXT("graph"), &HandlePerformanceCommands },
 	{ TEXT("anim"), TEXT("skinning"), &HandlePerformanceCommands },
+	{ TEXT("niagara"), TEXT("top-systems"), &HandlePerformanceCommands },
+	{ TEXT("niagara"), TEXT("emitter-cost"), &HandlePerformanceCommands },
 	{ TEXT("slate"), TEXT("top-widgets"), &HandlePerformanceCommands },
 	{ TEXT("slate"), TEXT("paint-cost"), &HandlePerformanceCommands },
 	{ TEXT("slate"), TEXT("invalidation-rate"), &HandlePerformanceCommands },

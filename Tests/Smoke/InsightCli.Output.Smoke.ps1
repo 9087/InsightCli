@@ -691,6 +691,38 @@ function Invoke-NormalTraceSmoke {
                 throw 'Expected net bandwidth-series explicit time window metadata'
             }
         }),
+        (New-SmokeCase -Message "[$([IO.Path]::GetFileName($TracePath))] Verify niagara top-systems returns fallback system hotspots..." -Context 'niagara top-systems' -Args @($TracePath, 'niagara', 'top-systems', '--limit', '3') -MustContain @('"data"') -Validate {
+            param($result)
+            $json = Parse-JsonOutput -Text $result.Text -Context 'niagara top-systems'
+            if ($null -eq $json.data) {
+                throw 'Expected niagara top-systems response to include data array'
+            }
+            if ($json.data.Count -gt 3) {
+                throw 'Expected niagara top-systems count <= limit'
+            }
+            if ($json.meta.data_source -ne 'cpu_scope_pattern') {
+                throw 'Expected niagara top-systems meta.data_source=cpu_scope_pattern'
+            }
+            if ([string]::IsNullOrWhiteSpace([string]$json.meta.warning)) {
+                throw 'Expected niagara top-systems fallback warning metadata'
+            }
+        }),
+        (New-SmokeCase -Message "[$([IO.Path]::GetFileName($TracePath))] Verify niagara emitter-cost supports system filter..." -Context 'niagara emitter-cost' -Args @($TracePath, 'niagara', 'emitter-cost', '--system', 'Niagara') -MustContain @('"data"') -Validate {
+            param($result)
+            $json = Parse-JsonOutput -Text $result.Text -Context 'niagara emitter-cost'
+            if ($null -eq $json.data) {
+                throw 'Expected niagara emitter-cost response to include data array'
+            }
+            if ($json.meta.system -ne 'Niagara') {
+                throw 'Expected niagara emitter-cost meta.system to echo filter value'
+            }
+            if ($json.meta.data_source -ne 'cpu_scope_pattern') {
+                throw 'Expected niagara emitter-cost meta.data_source=cpu_scope_pattern'
+            }
+            if ([string]::IsNullOrWhiteSpace([string]$json.meta.warning)) {
+                throw 'Expected niagara emitter-cost fallback warning metadata'
+            }
+        }),
         (New-SmokeCase -Message "[$([IO.Path]::GetFileName($TracePath))] Verify threads waits returns trace-backed wait diagnostics..." -Context 'threads waits' -Args @($TracePath, 'threads', 'waits', '--frame-index', '1', '--limit', '3') -MustContain @('"data"', '"data_source"') -Validate {
             param($result)
             $json = Parse-JsonOutput -Text $result.Text -Context 'threads waits'

@@ -15,6 +15,7 @@ InsightCli 是一个命令行工具，用于读取 Unreal trace 文件（`.utrac
 - `cpu`
 - `gpu`
 - `anim`
+- `niagara`
 - `slate`
 - `threads`
 - `tasks`
@@ -676,6 +677,25 @@ InsightCli.exe C:/traces/run01.utrace rhi drawcalls --limit 5
 
 说明：
 - 当 Net channel 数据不可用时，这些命令会回退到 CPU scope 名称模式近似，并在 `meta.warning` 标注。
+
+## 5.8.19 `niagara top-systems`
+
+用途：
+- 返回按 CPU scope 近似统计的 Niagara system 热点。
+
+参数：
+- `--limit <n>`：返回记录数量上限。
+
+## 5.8.20 `niagara emitter-cost`
+
+用途：
+- 返回指定 Niagara system 的 emitter 级耗时近似值。
+
+参数：
+- `--system <name>`：Niagara system 名称片段（必填）。
+
+说明：
+- 当 Niagara channel 数据不可用时，这些命令会回退到 CPU scope 名称模式近似，并在 `meta.warning` 标注。
 
 ## 5.9 `threads waits`
 

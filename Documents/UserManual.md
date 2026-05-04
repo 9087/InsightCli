@@ -15,6 +15,7 @@ Supported command groups:
 - `cpu`
 - `gpu`
 - `anim`
+- `niagara`
 - `slate`
 - `threads`
 - `tasks`
@@ -678,6 +679,25 @@ Options:
 
 Notes:
 - When Net channel data is unavailable, these commands fall back to CPU scope name pattern approximation and emit `meta.warning`.
+
+## 5.8.19 `niagara top-systems`
+
+Purpose:
+- Return top Niagara systems by approximated CPU scope cost.
+
+Options:
+- `--limit <n>`: Maximum row count.
+
+## 5.8.20 `niagara emitter-cost`
+
+Purpose:
+- Return emitter-level cost approximation for a selected Niagara system.
+
+Options:
+- `--system <name>`: Niagara system name fragment (required).
+
+Notes:
+- When Niagara channel data is unavailable, these commands fall back to CPU scope name pattern approximation and emit `meta.warning`.
 
 ## 5.9 `threads waits`
 
