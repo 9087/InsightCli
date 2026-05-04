@@ -419,6 +419,39 @@ function Invoke-NormalTraceSmoke {
                 Assert-Descending -Items $json.data -Property 'gpu_ms' -Context 'gpu passes'
             }
         }),
+        (New-SmokeCase -Message "[$([IO.Path]::GetFileName($TracePath))] Verify rhi summary returns draw-call metrics..." -Context 'rhi summary' -Args @($TracePath, 'rhi', 'summary', '--frame-index', '1') -MustContain @('"data"', '"draw_call_count"') -Validate {
+            param($result)
+            $json = Parse-JsonOutput -Text $result.Text -Context 'rhi summary'
+            if ($null -eq $json.data) {
+                throw 'Expected rhi summary response to include data object'
+            }
+            foreach ($field in @('draw_call_count', 'primitive_count', 'triangle_count', 'rhi_thread_ms')) {
+                if ($null -eq $json.data.$field) {
+                    throw "Expected rhi summary field: $field"
+                }
+            }
+        }),
+        (New-SmokeCase -Message "[$([IO.Path]::GetFileName($TracePath))] Verify rhi drawcalls returns sorted rows..." -Context 'rhi drawcalls' -Args @($TracePath, 'rhi', 'drawcalls', '--limit', '3') -MustContain @('"data"') -Validate {
+            param($result)
+            $json = Parse-JsonOutput -Text $result.Text -Context 'rhi drawcalls'
+            if ($null -eq $json.data) {
+                throw 'Expected rhi drawcalls response to include data array'
+            }
+            if ($json.data.Count -gt 3) {
+                throw 'Expected rhi drawcalls count <= limit'
+            }
+            foreach ($item in $json.data) {
+                if ([string]::IsNullOrWhiteSpace([string]$item.render_target)) {
+                    throw 'Expected render_target in rhi drawcalls rows'
+                }
+                if ($null -eq $item.draw_call_count -or $null -eq $item.gpu_ms) {
+                    throw 'Expected draw_call_count and gpu_ms in rhi drawcalls rows'
+                }
+            }
+            if ($json.data.Count -gt 0) {
+                Assert-Descending -Items $json.data -Property 'draw_call_count' -Context 'rhi drawcalls'
+            }
+        }),
         (New-SmokeCase -Message "[$([IO.Path]::GetFileName($TracePath))] Verify threads waits returns trace-backed wait diagnostics..." -Context 'threads waits' -Args @($TracePath, 'threads', 'waits', '--frame-index', '1', '--limit', '3') -MustContain @('"data"', '"data_source"') -Validate {
             param($result)
             $json = Parse-JsonOutput -Text $result.Text -Context 'threads waits'

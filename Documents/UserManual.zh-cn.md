@@ -479,6 +479,90 @@ InsightCli.exe C:/traces/run01.utrace gpu passes --frame-index 120
 }
 ```
 
+## 5.8.2 `rhi summary`
+
+用途：
+- 返回 RHI 维度汇总指标，包括 draw call 数和 RHI 线程耗时近似值。
+
+参数：
+- `--frame-index <n>`：限制到单帧统计。
+
+示例：
+
+```powershell
+InsightCli.exe C:/traces/run01.utrace rhi summary --frame-index 120
+```
+
+示例输出：
+
+```json
+{
+  "data": {
+    "draw_call_count": 460,
+    "primitive_count": 0,
+    "triangle_count": 0,
+    "rhi_thread_ms": 0.0
+  },
+  "meta": {
+    "frame_index": "120",
+    "data_source": "approx_cpu_gpu",
+    "approximation": "draw_calls_from_gpu_passes; rhi_thread_ms_from_frame_samples"
+  }
+}
+```
+
+## 5.8.3 `rhi drawcalls`
+
+用途：
+- 返回按 draw call 数排序的热点行。
+
+参数：
+- `--limit <n>`：返回记录数量上限。
+- `--frame-index <n>`：限制到单帧。
+
+示例：
+
+```powershell
+InsightCli.exe C:/traces/run01.utrace rhi drawcalls --limit 5
+```
+
+示例输出：
+
+```json
+{
+  "data": [
+    {
+      "render_target": "BasePass",
+      "material": "unknown",
+      "mesh": "unknown",
+      "draw_call_count": 240,
+      "gpu_ms": 4.2
+    }
+  ],
+  "meta": {
+    "limit": "5",
+    "data_source": "approx_cpu_gpu",
+    "approximation": "draw_calls_from_gpu_passes"
+  }
+}
+```
+
+## 5.8.4 `rhi top-materials`
+
+用途：
+- 返回按 draw call 数排序的材质热点分桶。
+
+说明：
+- 当 material 维度 channel 不可用时，输出单个 `unknown` 分桶。
+
+## 5.8.5 `rhi top-meshes`
+
+用途：
+- 返回按 draw call 数排序的 mesh 热点分桶。
+
+说明：
+- 当 mesh 维度 channel 不可用时，输出单个 `unknown` 分桶。
+
 ## 5.9 `threads waits`
 
 用途：

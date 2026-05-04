@@ -481,6 +481,90 @@ Sample output:
 }
 ```
 
+## 5.8.2 `rhi summary`
+
+Purpose:
+- Return RHI-level summary metrics, including draw call count and RHI thread time approximation.
+
+Options:
+- `--frame-index <n>`: Restrict summary to one frame.
+
+Example:
+
+```powershell
+InsightCli.exe C:/traces/run01.utrace rhi summary --frame-index 120
+```
+
+Sample output:
+
+```json
+{
+  "data": {
+    "draw_call_count": 460,
+    "primitive_count": 0,
+    "triangle_count": 0,
+    "rhi_thread_ms": 0.0
+  },
+  "meta": {
+    "frame_index": "120",
+    "data_source": "approx_cpu_gpu",
+    "approximation": "draw_calls_from_gpu_passes; rhi_thread_ms_from_frame_samples"
+  }
+}
+```
+
+## 5.8.3 `rhi drawcalls`
+
+Purpose:
+- Return draw call hotspots sorted by draw call count.
+
+Options:
+- `--limit <n>`: Maximum number of rows returned.
+- `--frame-index <n>`: Restrict drawcall rows to one frame.
+
+Example:
+
+```powershell
+InsightCli.exe C:/traces/run01.utrace rhi drawcalls --limit 5
+```
+
+Sample output:
+
+```json
+{
+  "data": [
+    {
+      "render_target": "BasePass",
+      "material": "unknown",
+      "mesh": "unknown",
+      "draw_call_count": 240,
+      "gpu_ms": 4.2
+    }
+  ],
+  "meta": {
+    "limit": "5",
+    "data_source": "approx_cpu_gpu",
+    "approximation": "draw_calls_from_gpu_passes"
+  }
+}
+```
+
+## 5.8.4 `rhi top-materials`
+
+Purpose:
+- Return top material buckets by draw call count.
+
+Notes:
+- When material-level channels are unavailable, output uses a single `unknown` bucket.
+
+## 5.8.5 `rhi top-meshes`
+
+Purpose:
+- Return top mesh buckets by draw call count.
+
+Notes:
+- When mesh-level channels are unavailable, output uses a single `unknown` bucket.
+
 ## 5.9 `threads waits`
 
 Purpose:
