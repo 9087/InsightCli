@@ -17,6 +17,7 @@ Supported command groups:
 - `threads`
 - `tasks`
 - `loadtime`
+- `gc`
 - `symbols`
 - `counters`
 - `memory`
@@ -888,6 +889,20 @@ Commands:
 Notes:
 - If the trace does not include the LoadTime channel, the command returns success with empty data and `meta.channel_state`.
 - `loadtime timeline` echoes time-window metadata in `meta`.
+
+## 5.12 `gc` commands
+
+Purpose:
+- Surface garbage collection events from trace CPU scopes in structured form.
+
+Commands:
+- `gc summary`
+- `gc events --limit <n>`
+- `gc longest --limit <n>`
+
+Notes:
+- GC detection currently relies on CPU scope name patterns and reports `meta.source=cpu_scope_pattern`.
+- Pattern-based matching can vary across engine versions and trace instrumentation settings.
 
 ## 6. Practical Workflows
 

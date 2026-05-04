@@ -10,6 +10,7 @@ It reads `.utrace` / `.trace` inputs and returns machine-friendly JSON output fo
 - CPU and GPU hotspots: `cpu top`, `cpu stack`, `gpu top`, `gpu pass-detail`
 - Threads and tasks: `threads waits`, `tasks top`
 - Asset loading diagnostics: `loadtime summary`, `loadtime packages`, `loadtime slowest`, `loadtime timeline`
+- GC diagnostics: `gc summary`, `gc events`, `gc longest`
 - Counters and memory: `counters list`, `counters series`, `counters stats`, `memory summary`, `memory peak`, `memory tags`
 - Marks and symbols: `marks search`, `marks around`, `symbols resolve`
 
@@ -60,6 +61,10 @@ InsightCli.exe <trace_path> loadtime slowest --limit 10
 
 # Load time timeline in a time window
 InsightCli.exe <trace_path> loadtime timeline --time-start 0 --time-end 5000
+
+# GC event summary and longest events
+InsightCli.exe <trace_path> gc summary
+InsightCli.exe <trace_path> gc longest --limit 5
 
 # List enabled/known trace channels
 InsightCli.exe <trace_path> info channels
@@ -140,3 +145,4 @@ powershell -ExecutionPolicy Bypass -File Engine/Source/Programs/InsightCli/Tools
 - For incident analysis, combine `frames slowest` -> `cpu/gpu` -> `threads/tasks` in that order.
 - Treat CLI output as structured data first (JSON parsing) rather than plain text.
 - Startup performance is currently considered good enough; use the perf compare script for periodic regression checks instead of continuous micro-optimization.
+- GC results are inferred from CPU scope name patterns (`meta.source=cpu_scope_pattern`), so pattern coverage may vary by engine version.

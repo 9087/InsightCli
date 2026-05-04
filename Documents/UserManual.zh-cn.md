@@ -17,6 +17,7 @@ InsightCli 是一个命令行工具，用于读取 Unreal trace 文件（`.utrac
 - `threads`
 - `tasks`
 - `loadtime`
+- `gc`
 - `symbols`
 - `counters`
 - `memory`
@@ -888,6 +889,20 @@ InsightCli.exe C:/traces/run01.utrace marks around --timestamp 12000 --window 50
 说明：
 - 当 trace 未包含 LoadTime 通道时，命令会成功返回空数据，并在 `meta.channel_state` 给出提示。
 - `loadtime timeline` 会在 `meta` 中回显时间窗口信息。
+
+## 5.12 `gc` 命令
+
+用途：
+- 以结构化方式输出 trace 中的垃圾回收事件。
+
+命令：
+- `gc summary`
+- `gc events --limit <n>`
+- `gc longest --limit <n>`
+
+说明：
+- 当前 GC 识别依赖 CPU scope 名称 pattern，并通过 `meta.source=cpu_scope_pattern` 标识来源。
+- 该匹配方式受引擎版本与 trace 埋点影响，覆盖范围可能变化。
 
 ## 6. 实用工作流
 

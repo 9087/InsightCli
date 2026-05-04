@@ -418,6 +418,26 @@ function Invoke-NormalTraceSmoke {
                 }
             }
         }),
+        (New-SmokeCase -Message "[$([IO.Path]::GetFileName($TracePath))] Verify gc summary returns structured aggregation..." -Context 'gc summary' -Args @($TracePath, 'gc', 'summary') -MustContain @('"data"', '"gc_count"', '"source"') -Validate {
+            param($result)
+            $json = Parse-JsonOutput -Text $result.Text -Context 'gc summary'
+            if ($json.meta.source -ne 'cpu_scope_pattern') {
+                throw 'Expected gc summary meta.source=cpu_scope_pattern'
+            }
+            if ($null -eq $json.data.avg_gc_ms -or $null -eq $json.data.max_gc_ms) {
+                throw 'Expected gc summary to include avg_gc_ms and max_gc_ms'
+            }
+        }),
+        (New-SmokeCase -Message "[$([IO.Path]::GetFileName($TracePath))] Verify gc longest respects limit and ordering..." -Context 'gc longest' -Args @($TracePath, 'gc', 'longest', '--limit', '3') -MustContain @('"data"', '"duration_ms"', '"source"') -Validate {
+            param($result)
+            $json = Parse-JsonOutput -Text $result.Text -Context 'gc longest'
+            if ($json.data.Count -gt 3) {
+                throw 'Expected gc longest count <= limit'
+            }
+            if ($json.data.Count -gt 0) {
+                Assert-Descending -Items $json.data -Property 'duration_ms' -Context 'gc longest'
+            }
+        }),
         (New-SmokeCase -Message "[$([IO.Path]::GetFileName($TracePath))] Verify symbols resolve returns symbol mapping..." -Context 'symbols resolve' -Args @($TracePath, 'symbols', 'resolve', '--name', 'MoveActors') -Validate {
             param($result)
             $cpuTopResult = Invoke-InsightCli -Args @($TracePath, 'cpu', 'top', '--thread', 'GameThread', '--limit', '1')
