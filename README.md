@@ -8,7 +8,7 @@ It reads `.utrace` / `.trace` inputs and returns machine-friendly JSON output fo
 - Session and trace metadata: `info summary`, `info channels`
 - Frame analysis: `frames summary`, `frames slowest`, `frames detail`
 - CPU and GPU hotspots: `cpu top`, `cpu stack`, `gpu top`, `gpu pass-detail`
-- Threads and tasks: `threads waits`, `tasks top`
+- Threads and tasks: `threads waits`, `threads wait-chain`, `tasks top`
 - Asset loading diagnostics: `loadtime summary`, `loadtime packages`, `loadtime slowest`, `loadtime timeline`
 - GC diagnostics: `gc summary`, `gc events`, `gc longest`
 - Counters and memory: `counters list`, `counters series`, `counters stats`, `memory summary`, `memory peak`, `memory tags`, `memory alloc-top`, `memory leak-suspect`
@@ -69,6 +69,9 @@ InsightCli.exe <trace_path> gc longest --limit 5
 # Memory allocation hotspots and leak suspects
 InsightCli.exe <trace_path> memory alloc-top --by tag --limit 10
 InsightCli.exe <trace_path> memory leak-suspect --window 5 --limit 10
+
+# Thread wait causality chain
+InsightCli.exe <trace_path> threads wait-chain --thread GameThread --depth 4 --time-start 0 --time-end 5000
 
 # List enabled/known trace channels
 InsightCli.exe <trace_path> info channels

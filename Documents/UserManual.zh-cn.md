@@ -429,6 +429,69 @@ InsightCli.exe C:/traces/run01.utrace threads waits --frame-index 120 --limit 5
 }
 ```
 
+## 5.9.1 `threads wait-chain`
+
+用途：
+- 针对指定线程构建等待因果链。
+
+参数：
+- `--thread <name>`（必填）：目标线程名过滤。
+- `--depth <n>`：输出链路最大跳数，默认 `4`。
+- `--time-start <ms>`：时间窗口起点（毫秒，包含）。
+- `--time-end <ms>`：时间窗口终点（毫秒，不包含）。
+
+示例：
+
+```powershell
+InsightCli.exe C:/traces/run01.utrace threads wait-chain --thread GameThread --depth 4 --time-start 0 --time-end 5000
+```
+
+示例输出：
+
+```json
+{
+  "data": [
+    {
+      "frame_index": 120,
+      "begin_ms": 5101.0,
+      "end_ms": 5104.5,
+      "wait_ms": 3.5,
+      "chain_depth": 2,
+      "confidence": "medium",
+      "chain": [
+        {
+          "hop_index": 0,
+          "thread_id": 1234,
+          "thread_name": "GameThread",
+          "task_id": -1,
+          "task_name": "unavailable",
+          "wait_ms": 3.5,
+          "next_thread_id": 5678,
+          "next_thread_name": "RenderThread",
+          "next_task": "unavailable"
+        },
+        {
+          "hop_index": 1,
+          "thread_id": 5678,
+          "thread_name": "RenderThread",
+          "task_id": -1,
+          "task_name": "unavailable",
+          "wait_ms": 0.0,
+          "next_thread_id": -1,
+          "next_thread_name": "",
+          "next_task": "unavailable"
+        }
+      ]
+    }
+  ],
+  "meta": {
+    "thread": "GameThread",
+    "depth": "4",
+    "data_source": "trace"
+  }
+}
+```
+
 ## 5.10 `tasks top`
 
 用途：

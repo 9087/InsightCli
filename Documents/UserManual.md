@@ -429,6 +429,69 @@ Sample output:
 }
 ```
 
+## 5.9.1 `threads wait-chain`
+
+Purpose:
+- Build wait causality chains for one target thread.
+
+Options:
+- `--thread <name>` (required): Target thread name filter.
+- `--depth <n>`: Max hop depth to emit. Default: `4`.
+- `--time-start <ms>`: Inclusive start timestamp in milliseconds.
+- `--time-end <ms>`: Exclusive end timestamp in milliseconds.
+
+Example:
+
+```powershell
+InsightCli.exe C:/traces/run01.utrace threads wait-chain --thread GameThread --depth 4 --time-start 0 --time-end 5000
+```
+
+Sample output:
+
+```json
+{
+  "data": [
+    {
+      "frame_index": 120,
+      "begin_ms": 5101.0,
+      "end_ms": 5104.5,
+      "wait_ms": 3.5,
+      "chain_depth": 2,
+      "confidence": "medium",
+      "chain": [
+        {
+          "hop_index": 0,
+          "thread_id": 1234,
+          "thread_name": "GameThread",
+          "task_id": -1,
+          "task_name": "unavailable",
+          "wait_ms": 3.5,
+          "next_thread_id": 5678,
+          "next_thread_name": "RenderThread",
+          "next_task": "unavailable"
+        },
+        {
+          "hop_index": 1,
+          "thread_id": 5678,
+          "thread_name": "RenderThread",
+          "task_id": -1,
+          "task_name": "unavailable",
+          "wait_ms": 0.0,
+          "next_thread_id": -1,
+          "next_thread_name": "",
+          "next_task": "unavailable"
+        }
+      ]
+    }
+  ],
+  "meta": {
+    "thread": "GameThread",
+    "depth": "4",
+    "data_source": "trace"
+  }
+}
+```
+
 ## 5.10 `tasks top`
 
 Purpose:

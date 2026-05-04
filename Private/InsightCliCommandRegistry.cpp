@@ -30,6 +30,7 @@ constexpr FCommandCatalogEntry CommandCatalog[] =
 	{ TEXT("gpu"), TEXT("top"), &HandlePerformanceCommands },
 	{ TEXT("gpu"), TEXT("pass-detail"), &HandlePerformanceCommands },
 	{ TEXT("threads"), TEXT("waits"), &HandlePerformanceCommands },
+	{ TEXT("threads"), TEXT("wait-chain"), &HandlePerformanceCommands },
 	{ TEXT("tasks"), TEXT("top"), &HandlePerformanceCommands },
 	{ TEXT("symbols"), TEXT("resolve"), &HandleDataCommands },
 	{ TEXT("counters"), TEXT("list"), &HandleDataCommands },

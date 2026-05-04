@@ -342,6 +342,32 @@ function Invoke-NormalTraceSmoke {
             }
         }),
         (New-SmokeCase -Message "[$([IO.Path]::GetFileName($TracePath))] Verify threads waits works without frame filter..." -Context 'threads waits no-frame' -Args @($TracePath, 'threads', 'waits', '--limit', '3') -MustContain @('"data"', '"data_source"')),
+        (New-SmokeCase -Message "[$([IO.Path]::GetFileName($TracePath))] Verify threads wait-chain returns chain diagnostics..." -Context 'threads wait-chain' -Args @($TracePath, 'threads', 'wait-chain', '--thread', 'GameThread', '--depth', '4', '--time-start', '0', '--time-end', '5000') -MustContain @('"data"') -Validate {
+            param($result)
+            $json = Parse-JsonOutput -Text $result.Text -Context 'threads wait-chain'
+            if ($null -eq $json.data) {
+                throw 'Expected threads wait-chain response to include data array'
+            }
+            if ($json.meta.data_source -ne 'trace') {
+                throw 'Expected threads wait-chain meta.data_source=trace'
+            }
+            if ($json.meta.time_window_source -ne 'explicit') {
+                throw 'Expected threads wait-chain explicit time window metadata'
+            }
+
+            foreach ($item in $json.data) {
+                if ($null -eq $item.chain -or $item.chain.Count -lt 1) {
+                    throw 'Expected non-empty chain array in threads wait-chain rows'
+                }
+                if ($null -eq $item.wait_ms) {
+                    throw 'Expected wait_ms in threads wait-chain rows'
+                }
+            }
+
+            if ($json.data.Count -gt 0) {
+                Assert-Descending -Items $json.data -Property 'wait_ms' -Context 'threads wait-chain'
+            }
+        }),
         (New-SmokeCase -Message "[$([IO.Path]::GetFileName($TracePath))] Verify tasks top returns trace-backed task diagnostics..." -Context 'tasks top' -Args @($TracePath, 'tasks', 'top', '--frame-index', '1', '--limit', '3') -MustContain @('"data"', '"data_source"') -Validate {
             param($result)
             $json = Parse-JsonOutput -Text $result.Text -Context 'tasks top'

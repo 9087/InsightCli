@@ -77,8 +77,42 @@ bool BuildThreadWaitSamplesTrace(
 		}
 
 		const TraceServices::IThreadProvider& ThreadProvider = TraceServices::ReadThreadProvider(*Session.Get());
+
+		struct FThreadRunSegment
+		{
+			double StartSec = 0.0;
+			double EndSec = 0.0;
+		};
+
+		TMap<int32, FString> ThreadNames;
+		TMap<int32, TArray<FThreadRunSegment>> ThreadRunSegments;
+
 		ThreadProvider.EnumerateThreads([&](const TraceServices::FThreadInfo& ThreadInfo)
 		{
+			const int32 ThreadId = static_cast<int32>(ThreadInfo.Id);
+			ThreadNames.Add(ThreadId, ThreadInfo.Name != nullptr ? ThreadInfo.Name : FString());
+
+			TArray<FThreadRunSegment> Segments;
+			ContextSwitchesProvider->EnumerateContextSwitches(ThreadInfo.Id, QueryStartSec, QueryEndSec,
+				[&Segments, QueryStartSec](const TraceServices::FContextSwitch& ContextSwitch)
+				{
+					const double StartSec = FMath::Max(QueryStartSec, ContextSwitch.Start);
+					const double EndSec = FMath::Max(StartSec, ContextSwitch.End);
+					if (EndSec > StartSec)
+					{
+						FThreadRunSegment& Segment = Segments.AddDefaulted_GetRef();
+						Segment.StartSec = StartSec;
+						Segment.EndSec = EndSec;
+					}
+					return TraceServices::EContextSwitchEnumerationResult::Continue;
+				});
+
+			ThreadRunSegments.Add(ThreadId, MoveTemp(Segments));
+		});
+
+		ThreadProvider.EnumerateThreads([&](const TraceServices::FThreadInfo& ThreadInfo)
+		{
+			const int32 CurrentThreadId = static_cast<int32>(ThreadInfo.Id);
 			double LastRunEndSec = QueryStartSec;
 			bool bSeenAnyRun = false;
 
@@ -99,15 +133,58 @@ bool BuildThreadWaitSamplesTrace(
 				Wait.EndMs = GapEndSec * 1000.0;
 				Wait.WaitMs = Wait.EndMs - Wait.BeginMs;
 
-				Wait.OwnerThreadId = -1;
-				Wait.OwnerThreadName.Reset();
-				Wait.BlockerThreadId = -1;
-				Wait.BlockerThreadName.Reset();
+				double BestOverlapSec = 0.0;
+				int32 BestBlockerThreadId = -1;
+				for (const TPair<int32, TArray<FThreadRunSegment>>& Pair : ThreadRunSegments)
+				{
+					const int32 CandidateThreadId = Pair.Key;
+					if (CandidateThreadId == CurrentThreadId)
+					{
+						continue;
+					}
+
+					double OverlapSec = 0.0;
+					for (const FThreadRunSegment& Segment : Pair.Value)
+					{
+						const double OverlapStartSec = FMath::Max(GapStartSec, Segment.StartSec);
+						const double OverlapEndSec = FMath::Min(GapEndSec, Segment.EndSec);
+						if (OverlapEndSec > OverlapStartSec)
+						{
+							OverlapSec += (OverlapEndSec - OverlapStartSec);
+						}
+					}
+
+					if (OverlapSec > BestOverlapSec)
+					{
+						BestOverlapSec = OverlapSec;
+						BestBlockerThreadId = CandidateThreadId;
+					}
+				}
+
 				Wait.BlockedToBlockerThreadChain.Reset();
 				Wait.BlockedToBlockerThreadChain.Add(Wait.ThreadId);
-				Wait.ChainDepth = 0;
-				Wait.ChainStatus = TEXT("unresolved");
-				Wait.UnresolvedReason = TEXT("blocker_unknown");
+				if (BestBlockerThreadId >= 0)
+				{
+					Wait.OwnerThreadId = BestBlockerThreadId;
+					Wait.BlockerThreadId = BestBlockerThreadId;
+					const FString* OwnerName = ThreadNames.Find(BestBlockerThreadId);
+					Wait.OwnerThreadName = OwnerName != nullptr ? *OwnerName : FString();
+					Wait.BlockerThreadName = Wait.OwnerThreadName;
+					Wait.BlockedToBlockerThreadChain.Add(BestBlockerThreadId);
+					Wait.ChainDepth = 1;
+					Wait.ChainStatus = TEXT("resolved");
+					Wait.UnresolvedReason.Reset();
+				}
+				else
+				{
+					Wait.OwnerThreadId = -1;
+					Wait.OwnerThreadName.Reset();
+					Wait.BlockerThreadId = -1;
+					Wait.BlockerThreadName.Reset();
+					Wait.ChainDepth = 0;
+					Wait.ChainStatus = TEXT("unresolved");
+					Wait.UnresolvedReason = TEXT("blocker_unknown");
+				}
 
 				OutSamples.Add(MoveTemp(Wait));
 			};
