@@ -183,7 +183,7 @@ bool HandleSlateCommands(const FInsightCliRequest& Request, const FTraceContext&
 		Meta.Add(TEXT("data_source"), TEXT("cpu_scope_pattern"));
 		if (Rows.IsEmpty())
 		{
-			Meta.Add(TEXT("warning"), TEXT("Slate channel unavailable or no matching scope samples."));
+			AddMetaWarning(Meta, TEXT("Slate channel unavailable or no matching scope samples."));
 		}
 
 		OutResponse = FInsightCliResponse::Ok(MakeEnvelopeWithArray(Data, Meta));
@@ -262,7 +262,7 @@ bool HandleSlateCommands(const FInsightCliRequest& Request, const FTraceContext&
 		TMap<FString, FString> Meta;
 		Meta.Add(TEXT("frame_index"), FString::FromInt(FrameIndex));
 		Meta.Add(TEXT("data_source"), TEXT("cpu_scope_pattern"));
-		Meta.Add(TEXT("warning"), TEXT("Approximation from CPU scope pattern; frame-local Slate channel data unavailable."));
+		AddMetaWarning(Meta, TEXT("Approximation from CPU scope pattern; frame-local Slate channel data unavailable."));
 		OutResponse = FInsightCliResponse::Ok(MakeEnvelopeWithObject(Data, Meta));
 		return true;
 	}
@@ -316,7 +316,7 @@ bool HandleSlateCommands(const FInsightCliRequest& Request, const FTraceContext&
 
 		TMap<FString, FString> Meta;
 		Meta.Add(TEXT("data_source"), TEXT("cpu_scope_pattern"));
-		Meta.Add(TEXT("warning"), TEXT("Slate invalidation-rate is approximated by CPU scope pattern because Slate trace channel may be unavailable."));
+		AddMetaWarning(Meta, TEXT("Slate invalidation-rate is approximated by CPU scope pattern because Slate trace channel may be unavailable."));
 		AppendTimeWindowMeta(TimeWindow, Meta);
 		OutResponse = FInsightCliResponse::Ok(MakeEnvelopeWithObject(Data, Meta));
 		return true;

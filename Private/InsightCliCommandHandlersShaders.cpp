@@ -24,7 +24,7 @@ bool IsPsoMissScope(const FString& ScopeName)
 void AddFallbackMeta(TMap<FString, FString>& Meta)
 {
 	Meta.Add(TEXT("data_source"), TEXT("cpu_scope_pattern"));
-	Meta.Add(TEXT("warning"), TEXT("Shader/PSO channel unavailable; values are approximated from CPU scope patterns."));
+	AddMetaWarning(Meta, TEXT("Shader/PSO channel unavailable; values are approximated from CPU scope patterns."));
 }
 
 bool BuildShaderRows(const FTraceContext& Context, TArray<FCpuScopeSample>& OutRows, FString& OutFailureStage, FString& OutFailureReason)

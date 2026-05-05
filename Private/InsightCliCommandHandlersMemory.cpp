@@ -460,11 +460,11 @@ bool HandleMemoryCommands(const FInsightCliRequest& Request, const FTraceContext
 		Meta.Add(TEXT("data_source"), Warning.IsEmpty() ? TEXT("trace") : TEXT("unavailable"));
 		if (!Warning.IsEmpty())
 		{
-			Meta.Add(TEXT("warning"), Warning);
+			AddMetaWarning(Meta, Warning);
 		}
 		else if (!T2Warning.IsEmpty())
 		{
-			Meta.Add(TEXT("warning"), T2Warning);
+			AddMetaWarning(Meta, T2Warning);
 		}
 
 		OutResponse = FInsightCliResponse::Ok(MakeEnvelopeWithArray(Data, Meta));
@@ -507,7 +507,7 @@ bool HandleMemoryCommands(const FInsightCliRequest& Request, const FTraceContext
 			Meta.Add(TEXT("limit"), FString::FromInt(Limit));
 			Meta.Add(TEXT("by"), TEXT("callstack"));
 			Meta.Add(TEXT("data_source"), TEXT("unavailable"));
-			Meta.Add(TEXT("warning"), TEXT("callstack mode requires MemAlloc metadata not exposed by current implementation."));
+			AddMetaWarning(Meta, TEXT("callstack mode requires MemAlloc metadata not exposed by current implementation."));
 			OutResponse = FInsightCliResponse::Ok(MakeEnvelopeWithArray({}, Meta));
 			return true;
 		}
@@ -567,7 +567,7 @@ bool HandleMemoryCommands(const FInsightCliRequest& Request, const FTraceContext
 		Meta.Add(TEXT("data_source"), Warning.IsEmpty() ? TEXT("trace") : TEXT("unavailable"));
 		if (!Warning.IsEmpty())
 		{
-			Meta.Add(TEXT("warning"), Warning);
+			AddMetaWarning(Meta, Warning);
 		}
 		OutResponse = FInsightCliResponse::Ok(MakeEnvelopeWithArray(Data, Meta));
 		return true;
@@ -694,11 +694,11 @@ bool HandleMemoryCommands(const FInsightCliRequest& Request, const FTraceContext
 		Meta.Add(TEXT("data_source"), Warning.IsEmpty() ? TEXT("trace") : TEXT("unavailable"));
 		if (!Warning.IsEmpty())
 		{
-			Meta.Add(TEXT("warning"), Warning);
+			AddMetaWarning(Meta, Warning);
 		}
 		else if (!WindowWarning.IsEmpty())
 		{
-			Meta.Add(TEXT("warning"), WindowWarning);
+			AddMetaWarning(Meta, WindowWarning);
 		}
 
 		OutResponse = FInsightCliResponse::Ok(MakeEnvelopeWithArray(Data, Meta));

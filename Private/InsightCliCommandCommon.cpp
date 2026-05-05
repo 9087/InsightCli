@@ -105,11 +105,81 @@ FString SerializeJson(const TSharedRef<FJsonObject>& Root)
 	return Output;
 }
 
+void EnsureWarningsArray(const TSharedRef<FJsonObject>& MetaObject)
+{
+	if (MetaObject->HasTypedField<EJson::Array>(TEXT("warnings")))
+	{
+		return;
+	}
+
+	const TSharedPtr<FJsonValue>* WarningValue = MetaObject->Values.Find(TEXT("warning"));
+	if (WarningValue == nullptr || !WarningValue->IsValid())
+	{
+		return;
+	}
+
+	FString WarningMessage;
+	if (!(*WarningValue)->TryGetString(WarningMessage) || WarningMessage.IsEmpty())
+	{
+		return;
+	}
+
+	FString WarningCode;
+	if (!MetaObject->TryGetStringField(TEXT("warning_code"), WarningCode) || WarningCode.IsEmpty())
+	{
+		WarningCode = TEXT("W0001");
+	}
+
+	FString WarningHint;
+	const bool bHasWarningHint = MetaObject->TryGetStringField(TEXT("warning_hint"), WarningHint) && !WarningHint.IsEmpty();
+
+	const TSharedRef<FJsonObject> WarningObject = MakeShared<FJsonObject>();
+	WarningObject->SetStringField(TEXT("code"), WarningCode);
+	WarningObject->SetStringField(TEXT("message"), WarningMessage);
+	if (bHasWarningHint)
+	{
+		WarningObject->SetStringField(TEXT("hint"), WarningHint);
+	}
+
+	TArray<TSharedPtr<FJsonValue>> Warnings;
+	Warnings.Add(MakeShared<FJsonValueObject>(WarningObject));
+	MetaObject->SetArrayField(TEXT("warnings"), Warnings);
+}
+
+TSharedRef<FJsonObject> MakeMetaObject(const TMap<FString, FString>& Meta)
+{
+	const TSharedRef<FJsonObject> MetaObject = MakeShared<FJsonObject>();
+	for (const TPair<FString, FString>& Pair : Meta)
+	{
+		MetaObject->SetStringField(Pair.Key, Pair.Value);
+	}
+	EnsureWarningsArray(MetaObject);
+	return MetaObject;
+}
+
 }
 
 FString ToNumberString(double Value)
 {
 	return FString::Printf(TEXT("%.3f"), Value);
+}
+
+void AddMetaWarning(TMap<FString, FString>& Meta, const FString& Message, const FString& Code, const FString& Hint)
+{
+	if (Message.IsEmpty())
+	{
+		return;
+	}
+
+	Meta.Add(TEXT("warning"), Message);
+	if (!Code.IsEmpty())
+	{
+		Meta.Add(TEXT("warning_code"), Code);
+	}
+	if (!Hint.IsEmpty())
+	{
+		Meta.Add(TEXT("warning_hint"), Hint);
+	}
 }
 
 TMap<FString, FString> MakeNotFoundMeta(const FInsightCliRequest& Request, const FString& Reason, const FString& QueryKey, const FString& QueryValue)
@@ -245,11 +315,7 @@ FString MakeEnvelopeWithObject(const TSharedRef<FJsonObject>& Data, const TMap<F
 	Root->SetObjectField(TEXT("data"), Data);
 	if (!Meta.IsEmpty())
 	{
-		const TSharedRef<FJsonObject> MetaObject = MakeShared<FJsonObject>();
-		for (const TPair<FString, FString>& Pair : Meta)
-		{
-			MetaObject->SetStringField(Pair.Key, Pair.Value);
-		}
+		const TSharedRef<FJsonObject> MetaObject = MakeMetaObject(Meta);
 		Root->SetObjectField(TEXT("meta"), MetaObject);
 	}
 	return SerializeJson(Root);
@@ -261,6 +327,7 @@ FString MakeEnvelopeWithObjectAndMeta(const TSharedRef<FJsonObject>& Data, const
 	Root->SetObjectField(TEXT("data"), Data);
 	if (MetaObject.IsValid() && MetaObject->Values.Num() > 0)
 	{
+		EnsureWarningsArray(MetaObject.ToSharedRef());
 		Root->SetObjectField(TEXT("meta"), MetaObject.ToSharedRef());
 	}
 	return SerializeJson(Root);
@@ -272,11 +339,7 @@ FString MakeEnvelopeWithArray(const TArray<TSharedPtr<FJsonValue>>& Data, const 
 	Root->SetArrayField(TEXT("data"), Data);
 	if (!Meta.IsEmpty())
 	{
-		const TSharedRef<FJsonObject> MetaObject = MakeShared<FJsonObject>();
-		for (const TPair<FString, FString>& Pair : Meta)
-		{
-			MetaObject->SetStringField(Pair.Key, Pair.Value);
-		}
+		const TSharedRef<FJsonObject> MetaObject = MakeMetaObject(Meta);
 		Root->SetObjectField(TEXT("meta"), MetaObject);
 	}
 	return SerializeJson(Root);

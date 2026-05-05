@@ -80,7 +80,7 @@ void SortAggregateRows(TArray<FAnimAggregateRow>& Rows)
 void AddFallbackMeta(TMap<FString, FString>& Meta, const TCHAR* Warning)
 {
 	Meta.Add(TEXT("data_source"), TEXT("cpu_scope_pattern"));
-	Meta.Add(TEXT("warning"), Warning);
+	AddMetaWarning(Meta, Warning);
 }
 }
 

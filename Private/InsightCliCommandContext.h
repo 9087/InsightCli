@@ -205,6 +205,7 @@ void AppendTimeWindowMeta(const FResolvedTimeWindowMs& TimeWindow, TMap<FString,
 bool TryGetPositiveLimit(const TArray<FString>& Args, int32 DefaultLimit, int32& OutLimit, FInsightCliResponse& OutError);
 bool RequireStringOption(const TArray<FString>& Args, const TCHAR* OptionName, const TCHAR* OwnerCommand, FString& OutValue, FInsightCliResponse& OutError);
 FString ToNumberString(double Value);
+void AddMetaWarning(TMap<FString, FString>& Meta, const FString& Message, const FString& Code = TEXT("W0001"), const FString& Hint = TEXT(""));
 TMap<FString, FString> MakeNotFoundMeta(const FInsightCliRequest& Request, const FString& Reason, const FString& QueryKey = TEXT(""), const FString& QueryValue = TEXT(""));
 FInsightCliResponse MakeOptionError(const FString& Message, const TMap<FString, FString>& Details = {});
 FInsightCliResponse MakeNotFoundError(const FString& Message, const TMap<FString, FString>& Details = {});

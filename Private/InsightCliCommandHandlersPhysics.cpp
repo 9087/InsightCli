@@ -74,7 +74,7 @@ FString GuessBodyName(const FString& ScopeName)
 void AddFallbackMeta(TMap<FString, FString>& Meta)
 {
 	Meta.Add(TEXT("data_source"), TEXT("cpu_scope_pattern"));
-	Meta.Add(TEXT("warning"), TEXT("Physics channel unavailable; values are approximated from CPU scope patterns."));
+	AddMetaWarning(Meta, TEXT("Physics channel unavailable; values are approximated from CPU scope patterns."));
 }
 
 bool BuildPhysicsRows(const FTraceContext& Context, TArray<FCpuScopeSample>& OutRows, FString& OutFailureStage, FString& OutFailureReason)

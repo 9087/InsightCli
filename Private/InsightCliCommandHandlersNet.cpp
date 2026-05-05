@@ -60,7 +60,7 @@ void SortRows(TArray<FNetAggregateRow>& Rows)
 void AddFallbackMeta(TMap<FString, FString>& Meta)
 {
 	Meta.Add(TEXT("data_source"), TEXT("cpu_scope_pattern"));
-	Meta.Add(TEXT("warning"), TEXT("Net channel unavailable; values are approximated from CPU scope patterns."));
+	AddMetaWarning(Meta, TEXT("Net channel unavailable; values are approximated from CPU scope patterns."));
 }
 
 bool BuildNetCpuRows(const FTraceContext& Context, TArray<FCpuScopeSample>& OutRows, FString& OutFailureStage, FString& OutFailureReason)

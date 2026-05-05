@@ -42,7 +42,7 @@ FString GuessSystemName(const FString& ScopeName)
 void AddFallbackMeta(TMap<FString, FString>& Meta)
 {
 	Meta.Add(TEXT("data_source"), TEXT("cpu_scope_pattern"));
-	Meta.Add(TEXT("warning"), TEXT("Niagara channel unavailable; values are approximated from CPU scope patterns."));
+	AddMetaWarning(Meta, TEXT("Niagara channel unavailable; values are approximated from CPU scope patterns."));
 }
 }
 

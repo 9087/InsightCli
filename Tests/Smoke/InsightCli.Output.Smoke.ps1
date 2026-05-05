@@ -527,7 +527,7 @@ function Invoke-NormalTraceSmoke {
                 }
             }
         }),
-        (New-SmokeCase -Message "[$([IO.Path]::GetFileName($TracePath))] Verify slate invalidation-rate includes fallback warning path..." -Context 'slate invalidation-rate warning' -Args @($TracePath, 'slate', 'invalidation-rate', '--time-start', '0', '--time-end', '1') -MustContain @('"warning"') -Validate {
+        (New-SmokeCase -Message "[$([IO.Path]::GetFileName($TracePath))] Verify slate invalidation-rate includes fallback warning path..." -Context 'slate invalidation-rate warning' -Args @($TracePath, 'slate', 'invalidation-rate', '--time-start', '0', '--time-end', '1') -MustContain @('"warning"', '"warnings"') -Validate {
             param($result)
             $json = Parse-JsonOutput -Text $result.Text -Context 'slate invalidation-rate warning'
             if ($json.meta.data_source -ne 'cpu_scope_pattern') {
@@ -535,6 +535,15 @@ function Invoke-NormalTraceSmoke {
             }
             if ([string]::IsNullOrWhiteSpace([string]$json.meta.warning)) {
                 throw 'Expected slate invalidation-rate warning metadata'
+            }
+            if ($null -eq $json.meta.warnings -or $json.meta.warnings.Count -lt 1) {
+                throw 'Expected slate invalidation-rate warning metadata to include warnings array'
+            }
+            if ([string]::IsNullOrWhiteSpace([string]$json.meta.warnings[0].message)) {
+                throw 'Expected slate invalidation-rate warnings[0].message to be non-empty'
+            }
+            if ([string]$json.meta.warning -ne [string]$json.meta.warnings[0].message) {
+                throw 'Expected meta.warning to mirror meta.warnings[0].message during compatibility window'
             }
         }),
         (New-SmokeCase -Message "[$([IO.Path]::GetFileName($TracePath))] Verify anim top-actors returns ranked actor rows..." -Context 'anim top-actors' -Args @($TracePath, 'anim', 'top-actors', '--limit', '3') -MustContain @('"data"') -Validate {

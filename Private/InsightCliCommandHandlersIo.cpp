@@ -193,7 +193,7 @@ bool HandleIoCommands(const FInsightCliRequest& Request, const FTraceContext& Co
 		Meta.Add(TEXT("data_source"), TEXT("trace"));
 		if (ChannelState != TEXT("trace"))
 		{
-			Meta.Add(TEXT("warning"), TEXT("FileActivity provider not available or read samples are empty."));
+			AddMetaWarning(Meta, TEXT("FileActivity provider not available or read samples are empty."));
 		}
 
 		OutResponse = FInsightCliResponse::Ok(MakeEnvelopeWithObject(Data, Meta));
@@ -267,7 +267,7 @@ bool HandleIoCommands(const FInsightCliRequest& Request, const FTraceContext& Co
 		Meta.Add(TEXT("data_source"), TEXT("trace"));
 		if (ChannelState != TEXT("trace"))
 		{
-			Meta.Add(TEXT("warning"), TEXT("FileActivity provider not available or read samples are empty."));
+			AddMetaWarning(Meta, TEXT("FileActivity provider not available or read samples are empty."));
 		}
 
 		OutResponse = FInsightCliResponse::Ok(MakeEnvelopeWithArray(Data, Meta));
@@ -343,7 +343,7 @@ bool HandleIoCommands(const FInsightCliRequest& Request, const FTraceContext& Co
 		Meta.Add(TEXT("data_source"), TEXT("trace"));
 		if (ChannelState != TEXT("trace"))
 		{
-			Meta.Add(TEXT("warning"), TEXT("FileActivity provider not available or read samples are empty."));
+			AddMetaWarning(Meta, TEXT("FileActivity provider not available or read samples are empty."));
 		}
 
 		OutResponse = FInsightCliResponse::Ok(MakeEnvelopeWithArray(Data, Meta));
