@@ -90,8 +90,11 @@ struct FThreadWaitSample
 	int32 ThreadId = -1;
 	FString ThreadName;
 	FString WaitType;
+	FString WaitTypeFromTrace;
 	FString WaitObject;
 	double WaitMs = 0.0;
+	double BlockerOverlapRatio = 0.0;
+	double BlockerConfidence = 0.0;
 	int32 OwnerThreadId = -1;
 	FString OwnerThreadName;
 	int32 BlockerThreadId = -1;

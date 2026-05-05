@@ -706,6 +706,9 @@ function Invoke-NormalTraceSmoke {
             if ($null -eq $json.data) {
                 throw 'Expected threads waits response to include data array'
             }
+            if ($json.meta.data_source -ne 'context_switch_heuristic') {
+                throw 'Expected threads waits meta.data_source=context_switch_heuristic'
+            }
             if ($json.data.Count -gt 3) {
                 throw 'Expected threads waits result count <= limit'
             }
@@ -715,6 +718,12 @@ function Invoke-NormalTraceSmoke {
                 }
                 if ($null -eq $item.wait_ms) {
                     throw 'Expected wait_ms for each threads waits row when data is non-empty'
+                }
+                if ($null -eq $item.blocker_overlap_ratio) {
+                    throw 'Expected blocker_overlap_ratio for each threads waits row when data is non-empty'
+                }
+                if ([string]$item.wait_type -eq 'NotRunning') {
+                    throw 'Expected wait_type to be classified, not NotRunning'
                 }
             }
             if ($json.data.Count -gt 0) {
@@ -728,11 +737,14 @@ function Invoke-NormalTraceSmoke {
             if ($null -eq $json.data) {
                 throw 'Expected threads wait-chain response to include data array'
             }
-            if ($json.meta.data_source -ne 'trace') {
-                throw 'Expected threads wait-chain meta.data_source=trace'
+            if ($json.meta.data_source -ne 'context_switch_heuristic') {
+                throw 'Expected threads wait-chain meta.data_source=context_switch_heuristic'
             }
             if ($json.meta.time_window_source -ne 'explicit') {
                 throw 'Expected threads wait-chain explicit time window metadata'
+            }
+            if ([string]::IsNullOrWhiteSpace([string]$json.meta.max_chain_depth_used)) {
+                throw 'Expected threads wait-chain meta.max_chain_depth_used'
             }
 
             foreach ($item in $json.data) {
@@ -741,6 +753,12 @@ function Invoke-NormalTraceSmoke {
                 }
                 if ($null -eq $item.wait_ms) {
                     throw 'Expected wait_ms in threads wait-chain rows'
+                }
+                if ($null -eq $item.blocker_overlap_ratio) {
+                    throw 'Expected blocker_overlap_ratio in threads wait-chain rows'
+                }
+                if ([string]::IsNullOrWhiteSpace([string]$item.chain_status)) {
+                    throw 'Expected chain_status in threads wait-chain rows'
                 }
             }
 

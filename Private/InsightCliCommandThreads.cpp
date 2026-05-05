@@ -127,8 +127,9 @@ bool BuildThreadWaitSamplesTrace(
 				Wait.FrameIndex = FrameIndexFilter.IsSet() ? FrameIndexFilter.GetValue() : GetFrameIndexForTimestampMs(GapStartSec * 1000.0);
 				Wait.ThreadId = static_cast<int32>(ThreadInfo.Id);
 				Wait.ThreadName = ThreadInfo.Name != nullptr ? ThreadInfo.Name : FString();
-				Wait.WaitType = TEXT("NotRunning");
-				Wait.WaitObject = TEXT("Scheduler");
+				Wait.WaitType = TEXT("Scheduler");
+				Wait.WaitTypeFromTrace = TEXT("Scheduler");
+				Wait.WaitObject = TEXT("ContextSwitchGap");
 				Wait.BeginMs = GapStartSec * 1000.0;
 				Wait.EndMs = GapEndSec * 1000.0;
 				Wait.WaitMs = Wait.EndMs - Wait.BeginMs;
@@ -165,6 +166,9 @@ bool BuildThreadWaitSamplesTrace(
 				Wait.BlockedToBlockerThreadChain.Add(Wait.ThreadId);
 				if (BestBlockerThreadId >= 0)
 				{
+					const double BestOverlapMs = BestOverlapSec * 1000.0;
+					Wait.BlockerOverlapRatio = Wait.WaitMs > 0.0 ? FMath::Clamp(BestOverlapMs / Wait.WaitMs, 0.0, 1.0) : 0.0;
+					Wait.BlockerConfidence = Wait.BlockerOverlapRatio;
 					Wait.OwnerThreadId = BestBlockerThreadId;
 					Wait.BlockerThreadId = BestBlockerThreadId;
 					const FString* OwnerName = ThreadNames.Find(BestBlockerThreadId);
@@ -177,6 +181,8 @@ bool BuildThreadWaitSamplesTrace(
 				}
 				else
 				{
+					Wait.BlockerOverlapRatio = 0.0;
+					Wait.BlockerConfidence = 0.0;
 					Wait.OwnerThreadId = -1;
 					Wait.OwnerThreadName.Reset();
 					Wait.BlockerThreadId = -1;
@@ -231,8 +237,11 @@ TSharedRef<FJsonObject> MakeThreadWaitObject(const FThreadWaitSample& Wait)
 	Item->SetNumberField(TEXT("thread_id"), Wait.ThreadId);
 	Item->SetStringField(TEXT("thread_name"), Wait.ThreadName);
 	Item->SetStringField(TEXT("wait_type"), Wait.WaitType);
+	Item->SetStringField(TEXT("wait_type_from_trace"), Wait.WaitTypeFromTrace);
 	Item->SetStringField(TEXT("wait_object"), Wait.WaitObject);
 	Item->SetNumberField(TEXT("wait_ms"), Wait.WaitMs);
+	Item->SetNumberField(TEXT("blocker_overlap_ratio"), Wait.BlockerOverlapRatio);
+	Item->SetNumberField(TEXT("blocker_confidence"), Wait.BlockerConfidence);
 	Item->SetNumberField(TEXT("owner_thread_id"), Wait.OwnerThreadId);
 	Item->SetStringField(TEXT("owner_thread_name"), Wait.OwnerThreadName);
 	Item->SetNumberField(TEXT("blocker_thread_id"), Wait.BlockerThreadId);
