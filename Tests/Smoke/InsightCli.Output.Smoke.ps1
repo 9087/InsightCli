@@ -52,6 +52,25 @@ function Parse-JsonOutput {
     }
 }
 
+function Assert-TraceUnavailableChannelDisabled {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Text,
+        [Parameter(Mandatory = $true)]
+        [string]$Context
+    )
+
+    if ($Text -notmatch '"code"\s*:\s*"E3001"') {
+        throw "Expected $Context output to contain error code E3001"
+    }
+    if ($Text -notmatch '"data_source"\s*:\s*"unavailable"') {
+        throw "Expected $Context output to contain data_source=unavailable"
+    }
+    if ($Text -notmatch '"unavailable_reason"\s*:\s*"channel_disabled"') {
+        throw "Expected $Context output to contain unavailable_reason=channel_disabled"
+    }
+}
+
 function Invoke-InsightCli {
     param(
         [Parameter(Mandatory = $true)]
@@ -556,130 +575,29 @@ function Invoke-NormalTraceSmoke {
                 Assert-Descending -Items $json.data -Property 'draw_call_count' -Context 'rhi drawcalls'
             }
         }),
-        (New-SmokeCase -Message "[$([IO.Path]::GetFileName($TracePath))] Verify slate top-widgets returns rows..." -Context 'slate top-widgets' -Args @($TracePath, 'slate', 'top-widgets', '--by', 'paint', '--limit', '3') -MustContain @('"data"') -Validate {
+        (New-SmokeCase -Message "[$([IO.Path]::GetFileName($TracePath))] Verify slate top-widgets reports channel-disabled trace unavailability..." -Context 'slate top-widgets' -Args @($TracePath, 'slate', 'top-widgets', '--by', 'paint', '--limit', '3') -AllowExitCodes @(10) -Validate {
             param($result)
-            $json = Parse-JsonOutput -Text $result.Text -Context 'slate top-widgets'
-            if ($null -eq $json.data) {
-                throw 'Expected slate top-widgets response to include data array'
-            }
-            if ($json.data.Count -gt 3) {
-                throw 'Expected slate top-widgets count <= limit'
-            }
-            foreach ($item in $json.data) {
-                if ([string]::IsNullOrWhiteSpace([string]$item.widget)) {
-                    throw 'Expected widget in slate top-widgets rows'
-                }
-                if ($null -eq $item.total_ms -or $null -eq $item.call_count) {
-                    throw 'Expected total_ms and call_count in slate top-widgets rows'
-                }
-            }
+            Assert-TraceUnavailableChannelDisabled -Text $result.Text -Context 'slate top-widgets'
         }),
-        (New-SmokeCase -Message "[$([IO.Path]::GetFileName($TracePath))] Verify slate paint-cost returns paint metrics..." -Context 'slate paint-cost' -Args @($TracePath, 'slate', 'paint-cost', '--frame-index', '1') -MustContain @('"paint_ms"') -Validate {
+        (New-SmokeCase -Message "[$([IO.Path]::GetFileName($TracePath))] Verify slate paint-cost reports channel-disabled trace unavailability..." -Context 'slate paint-cost' -Args @($TracePath, 'slate', 'paint-cost', '--frame-index', '1') -AllowExitCodes @(10) -Validate {
             param($result)
-            $json = Parse-JsonOutput -Text $result.Text -Context 'slate paint-cost'
-            if ($null -eq $json.data) {
-                throw 'Expected slate paint-cost response to include data object'
-            }
-            foreach ($field in @('frame_index', 'paint_ms', 'approx_widget_count')) {
-                if ($null -eq $json.data.$field) {
-                    throw "Expected slate paint-cost field: $field"
-                }
-            }
+            Assert-TraceUnavailableChannelDisabled -Text $result.Text -Context 'slate paint-cost'
         }),
-        (New-SmokeCase -Message "[$([IO.Path]::GetFileName($TracePath))] Verify slate invalidation-rate returns rate metrics..." -Context 'slate invalidation-rate' -Args @($TracePath, 'slate', 'invalidation-rate', '--time-start', '0', '--time-end', '1000') -MustContain @('"invalidations_per_sec"') -Validate {
+        (New-SmokeCase -Message "[$([IO.Path]::GetFileName($TracePath))] Verify slate invalidation-rate reports channel-disabled trace unavailability..." -Context 'slate invalidation-rate' -Args @($TracePath, 'slate', 'invalidation-rate', '--time-start', '0', '--time-end', '1000') -AllowExitCodes @(10) -Validate {
             param($result)
-            $json = Parse-JsonOutput -Text $result.Text -Context 'slate invalidation-rate'
-            if ($null -eq $json.data) {
-                throw 'Expected slate invalidation-rate response to include data object'
-            }
-            foreach ($field in @('invalidation_events', 'window_ms', 'invalidations_per_sec')) {
-                if ($null -eq $json.data.$field) {
-                    throw "Expected slate invalidation-rate field: $field"
-                }
-            }
+            Assert-TraceUnavailableChannelDisabled -Text $result.Text -Context 'slate invalidation-rate'
         }),
-        (New-SmokeCase -Message "[$([IO.Path]::GetFileName($TracePath))] Verify slate invalidation-rate includes fallback warning path..." -Context 'slate invalidation-rate warning' -Args @($TracePath, 'slate', 'invalidation-rate', '--time-start', '0', '--time-end', '1') -MustContain @('"warning"', '"warnings"') -Validate {
+        (New-SmokeCase -Message "[$([IO.Path]::GetFileName($TracePath))] Verify anim top-actors reports channel-disabled trace unavailability..." -Context 'anim top-actors' -Args @($TracePath, 'anim', 'top-actors', '--limit', '3') -AllowExitCodes @(10) -Validate {
             param($result)
-            $json = Parse-JsonOutput -Text $result.Text -Context 'slate invalidation-rate warning'
-            if ($json.meta.data_source -ne 'cpu_scope_pattern') {
-                throw 'Expected slate invalidation-rate warning meta.data_source=cpu_scope_pattern'
-            }
-            if ([string]::IsNullOrWhiteSpace([string]$json.meta.warning)) {
-                throw 'Expected slate invalidation-rate warning metadata'
-            }
-            if ($null -eq $json.meta.warnings -or $json.meta.warnings.Count -lt 1) {
-                throw 'Expected slate invalidation-rate warning metadata to include warnings array'
-            }
-            if ([string]::IsNullOrWhiteSpace([string]$json.meta.warnings[0].message)) {
-                throw 'Expected slate invalidation-rate warnings[0].message to be non-empty'
-            }
-            if ([string]$json.meta.warning -ne [string]$json.meta.warnings[0].message) {
-                throw 'Expected meta.warning to mirror meta.warnings[0].message during compatibility window'
-            }
+            Assert-TraceUnavailableChannelDisabled -Text $result.Text -Context 'anim top-actors'
         }),
-        (New-SmokeCase -Message "[$([IO.Path]::GetFileName($TracePath))] Verify anim top-actors returns ranked actor rows..." -Context 'anim top-actors' -Args @($TracePath, 'anim', 'top-actors', '--limit', '3') -MustContain @('"data"') -Validate {
+        (New-SmokeCase -Message "[$([IO.Path]::GetFileName($TracePath))] Verify anim graph reports channel-disabled trace unavailability..." -Context 'anim graph' -Args @($TracePath, 'anim', 'graph', '--actor', 'Character') -AllowExitCodes @(10) -Validate {
             param($result)
-            $json = Parse-JsonOutput -Text $result.Text -Context 'anim top-actors'
-            if ($null -eq $json.data) {
-                throw 'Expected anim top-actors response to include data array'
-            }
-            if ($json.data.Count -gt 3) {
-                throw 'Expected anim top-actors count <= limit'
-            }
-            if ($json.meta.data_source -ne 'cpu_scope_pattern') {
-                throw 'Expected anim top-actors meta.data_source=cpu_scope_pattern'
-            }
-            if ([string]::IsNullOrWhiteSpace([string]$json.meta.warning)) {
-                throw 'Expected anim top-actors fallback warning metadata'
-            }
-            foreach ($item in $json.data) {
-                if ([string]::IsNullOrWhiteSpace([string]$item.actor)) {
-                    throw 'Expected actor in anim top-actors rows'
-                }
-                if ($null -eq $item.anim_ms -or $null -eq $item.call_count) {
-                    throw 'Expected anim_ms and call_count in anim top-actors rows'
-                }
-            }
+            Assert-TraceUnavailableChannelDisabled -Text $result.Text -Context 'anim graph'
         }),
-        (New-SmokeCase -Message "[$([IO.Path]::GetFileName($TracePath))] Verify anim graph requires actor and returns node metrics..." -Context 'anim graph' -Args @($TracePath, 'anim', 'graph', '--actor', 'Character') -MustContain @('"data"') -Validate {
+        (New-SmokeCase -Message "[$([IO.Path]::GetFileName($TracePath))] Verify anim skinning reports channel-disabled trace unavailability..." -Context 'anim skinning' -Args @($TracePath, 'anim', 'skinning', '--limit', '3') -AllowExitCodes @(10) -Validate {
             param($result)
-            $json = Parse-JsonOutput -Text $result.Text -Context 'anim graph'
-            if ($null -eq $json.data) {
-                throw 'Expected anim graph response to include data array'
-            }
-            if ($json.meta.actor -ne 'Character') {
-                throw 'Expected anim graph meta.actor to echo actor filter'
-            }
-            if ($json.meta.data_source -ne 'cpu_scope_pattern') {
-                throw 'Expected anim graph meta.data_source=cpu_scope_pattern'
-            }
-            if ([string]::IsNullOrWhiteSpace([string]$json.meta.warning)) {
-                throw 'Expected anim graph fallback warning metadata'
-            }
-            foreach ($item in $json.data) {
-                if ([string]::IsNullOrWhiteSpace([string]$item.node)) {
-                    throw 'Expected node in anim graph rows'
-                }
-                if ($null -eq $item.total_ms -or $null -eq $item.call_count) {
-                    throw 'Expected total_ms and call_count in anim graph rows'
-                }
-            }
-        }),
-        (New-SmokeCase -Message "[$([IO.Path]::GetFileName($TracePath))] Verify anim skinning returns skinning hotspots..." -Context 'anim skinning' -Args @($TracePath, 'anim', 'skinning', '--limit', '3') -MustContain @('"data"') -Validate {
-            param($result)
-            $json = Parse-JsonOutput -Text $result.Text -Context 'anim skinning'
-            if ($null -eq $json.data) {
-                throw 'Expected anim skinning response to include data array'
-            }
-            if ($json.data.Count -gt 3) {
-                throw 'Expected anim skinning count <= limit'
-            }
-            if ($json.meta.data_source -ne 'cpu_scope_pattern') {
-                throw 'Expected anim skinning meta.data_source=cpu_scope_pattern'
-            }
-            if ([string]::IsNullOrWhiteSpace([string]$json.meta.warning)) {
-                throw 'Expected anim skinning fallback warning metadata'
-            }
+            Assert-TraceUnavailableChannelDisabled -Text $result.Text -Context 'anim skinning'
         }),
         (New-SmokeCase -Message "[$([IO.Path]::GetFileName($TracePath))] Verify io summary returns read totals and sync/async split..." -Context 'io summary' -Args @($TracePath, 'io', 'summary') -MustContain @('"data"') -Validate {
             param($result)
@@ -738,184 +656,49 @@ function Invoke-NormalTraceSmoke {
                 Assert-Descending -Items $json.data -Property 'read_bytes' -Context 'io top-files'
             }
         }),
-        (New-SmokeCase -Message "[$([IO.Path]::GetFileName($TracePath))] Verify net summary returns net approximation metrics..." -Context 'net summary' -Args @($TracePath, 'net', 'summary') -MustContain @('"data"') -Validate {
+        (New-SmokeCase -Message "[$([IO.Path]::GetFileName($TracePath))] Verify net summary reports channel-disabled trace unavailability..." -Context 'net summary' -Args @($TracePath, 'net', 'summary') -AllowExitCodes @(10) -Validate {
             param($result)
-            $json = Parse-JsonOutput -Text $result.Text -Context 'net summary'
-            if ($null -eq $json.data) {
-                throw 'Expected net summary response to include data object'
-            }
-            foreach ($field in @('scope_sample_count', 'total_net_ms', 'approx_rpc_calls', 'approx_actor_count')) {
-                if ($null -eq $json.data.$field) {
-                    throw "Expected net summary field: $field"
-                }
-            }
-            if ($json.meta.data_source -ne 'cpu_scope_pattern') {
-                throw 'Expected net summary meta.data_source=cpu_scope_pattern'
-            }
-            if ([string]::IsNullOrWhiteSpace([string]$json.meta.warning)) {
-                throw 'Expected net summary fallback warning metadata'
-            }
+            Assert-TraceUnavailableChannelDisabled -Text $result.Text -Context 'net summary'
         }),
-        (New-SmokeCase -Message "[$([IO.Path]::GetFileName($TracePath))] Verify net top-actors supports limit..." -Context 'net top-actors' -Args @($TracePath, 'net', 'top-actors', '--limit', '3') -MustContain @('"data"') -Validate {
+        (New-SmokeCase -Message "[$([IO.Path]::GetFileName($TracePath))] Verify net top-actors reports channel-disabled trace unavailability..." -Context 'net top-actors' -Args @($TracePath, 'net', 'top-actors', '--limit', '3') -AllowExitCodes @(10) -Validate {
             param($result)
-            $json = Parse-JsonOutput -Text $result.Text -Context 'net top-actors'
-            if ($null -eq $json.data) {
-                throw 'Expected net top-actors response to include data array'
-            }
-            if ($json.data.Count -gt 3) {
-                throw 'Expected net top-actors count <= limit'
-            }
-            if ($json.meta.data_source -ne 'cpu_scope_pattern') {
-                throw 'Expected net top-actors meta.data_source=cpu_scope_pattern'
-            }
-            if ([string]::IsNullOrWhiteSpace([string]$json.meta.warning)) {
-                throw 'Expected net top-actors fallback warning metadata'
-            }
+            Assert-TraceUnavailableChannelDisabled -Text $result.Text -Context 'net top-actors'
         }),
-        (New-SmokeCase -Message "[$([IO.Path]::GetFileName($TracePath))] Verify net top-rpcs returns ranked rpc rows..." -Context 'net top-rpcs' -Args @($TracePath, 'net', 'top-rpcs', '--limit', '3') -MustContain @('"data"') -Validate {
+        (New-SmokeCase -Message "[$([IO.Path]::GetFileName($TracePath))] Verify net top-rpcs reports channel-disabled trace unavailability..." -Context 'net top-rpcs' -Args @($TracePath, 'net', 'top-rpcs', '--limit', '3') -AllowExitCodes @(10) -Validate {
             param($result)
-            $json = Parse-JsonOutput -Text $result.Text -Context 'net top-rpcs'
-            if ($null -eq $json.data) {
-                throw 'Expected net top-rpcs response to include data array'
-            }
-            if ($json.data.Count -gt 3) {
-                throw 'Expected net top-rpcs count <= limit'
-            }
-            if ($json.meta.data_source -ne 'cpu_scope_pattern') {
-                throw 'Expected net top-rpcs meta.data_source=cpu_scope_pattern'
-            }
-            if ([string]::IsNullOrWhiteSpace([string]$json.meta.warning)) {
-                throw 'Expected net top-rpcs fallback warning metadata'
-            }
+            Assert-TraceUnavailableChannelDisabled -Text $result.Text -Context 'net top-rpcs'
         }),
-        (New-SmokeCase -Message "[$([IO.Path]::GetFileName($TracePath))] Verify net bandwidth-series exposes warning fallback path..." -Context 'net bandwidth-series' -Args @($TracePath, 'net', 'bandwidth-series', '--time-start', '0', '--time-end', '1000') -MustContain @('"data"') -Validate {
+        (New-SmokeCase -Message "[$([IO.Path]::GetFileName($TracePath))] Verify net bandwidth-series reports channel-disabled trace unavailability..." -Context 'net bandwidth-series' -Args @($TracePath, 'net', 'bandwidth-series', '--time-start', '0', '--time-end', '1000') -AllowExitCodes @(10) -Validate {
             param($result)
-            $json = Parse-JsonOutput -Text $result.Text -Context 'net bandwidth-series'
-            if ($null -eq $json.data) {
-                throw 'Expected net bandwidth-series response to include data array'
-            }
-            if ($json.meta.data_source -ne 'cpu_scope_pattern') {
-                throw 'Expected net bandwidth-series meta.data_source=cpu_scope_pattern'
-            }
-            if ([string]::IsNullOrWhiteSpace([string]$json.meta.warning)) {
-                throw 'Expected net bandwidth-series fallback warning metadata'
-            }
-            if ($json.meta.time_window_source -ne 'explicit') {
-                throw 'Expected net bandwidth-series explicit time window metadata'
-            }
+            Assert-TraceUnavailableChannelDisabled -Text $result.Text -Context 'net bandwidth-series'
         }),
-        (New-SmokeCase -Message "[$([IO.Path]::GetFileName($TracePath))] Verify niagara top-systems returns fallback system hotspots..." -Context 'niagara top-systems' -Args @($TracePath, 'niagara', 'top-systems', '--limit', '3') -MustContain @('"data"') -Validate {
+        (New-SmokeCase -Message "[$([IO.Path]::GetFileName($TracePath))] Verify niagara top-systems reports channel-disabled trace unavailability..." -Context 'niagara top-systems' -Args @($TracePath, 'niagara', 'top-systems', '--limit', '3') -AllowExitCodes @(10) -Validate {
             param($result)
-            $json = Parse-JsonOutput -Text $result.Text -Context 'niagara top-systems'
-            if ($null -eq $json.data) {
-                throw 'Expected niagara top-systems response to include data array'
-            }
-            if ($json.data.Count -gt 3) {
-                throw 'Expected niagara top-systems count <= limit'
-            }
-            if ($json.meta.data_source -ne 'cpu_scope_pattern') {
-                throw 'Expected niagara top-systems meta.data_source=cpu_scope_pattern'
-            }
-            if ([string]::IsNullOrWhiteSpace([string]$json.meta.warning)) {
-                throw 'Expected niagara top-systems fallback warning metadata'
-            }
+            Assert-TraceUnavailableChannelDisabled -Text $result.Text -Context 'niagara top-systems'
         }),
-        (New-SmokeCase -Message "[$([IO.Path]::GetFileName($TracePath))] Verify niagara emitter-cost supports system filter..." -Context 'niagara emitter-cost' -Args @($TracePath, 'niagara', 'emitter-cost', '--system', 'Niagara') -MustContain @('"data"') -Validate {
+        (New-SmokeCase -Message "[$([IO.Path]::GetFileName($TracePath))] Verify niagara emitter-cost reports channel-disabled trace unavailability..." -Context 'niagara emitter-cost' -Args @($TracePath, 'niagara', 'emitter-cost', '--system', 'Niagara') -AllowExitCodes @(10) -Validate {
             param($result)
-            $json = Parse-JsonOutput -Text $result.Text -Context 'niagara emitter-cost'
-            if ($null -eq $json.data) {
-                throw 'Expected niagara emitter-cost response to include data array'
-            }
-            if ($json.meta.system -ne 'Niagara') {
-                throw 'Expected niagara emitter-cost meta.system to echo filter value'
-            }
-            if ($json.meta.data_source -ne 'cpu_scope_pattern') {
-                throw 'Expected niagara emitter-cost meta.data_source=cpu_scope_pattern'
-            }
-            if ([string]::IsNullOrWhiteSpace([string]$json.meta.warning)) {
-                throw 'Expected niagara emitter-cost fallback warning metadata'
-            }
+            Assert-TraceUnavailableChannelDisabled -Text $result.Text -Context 'niagara emitter-cost'
         }),
-        (New-SmokeCase -Message "[$([IO.Path]::GetFileName($TracePath))] Verify physics summary returns stage totals..." -Context 'physics summary' -Args @($TracePath, 'physics', 'summary', '--frame-index', '1') -MustContain @('"data"') -Validate {
+        (New-SmokeCase -Message "[$([IO.Path]::GetFileName($TracePath))] Verify physics summary reports channel-disabled trace unavailability..." -Context 'physics summary' -Args @($TracePath, 'physics', 'summary', '--frame-index', '1') -AllowExitCodes @(10) -Validate {
             param($result)
-            $json = Parse-JsonOutput -Text $result.Text -Context 'physics summary'
-            if ($null -eq $json.data) {
-                throw 'Expected physics summary response to include data object'
-            }
-            foreach ($field in @('scope_sample_count', 'total_physics_ms', 'broadphase_ms', 'narrowphase_ms', 'constraint_ms', 'solver_ms')) {
-                if ($null -eq $json.data.$field) {
-                    throw "Expected physics summary field: $field"
-                }
-            }
-            if ($json.meta.data_source -ne 'cpu_scope_pattern') {
-                throw 'Expected physics summary meta.data_source=cpu_scope_pattern'
-            }
-            if ([string]::IsNullOrWhiteSpace([string]$json.meta.warning)) {
-                throw 'Expected physics summary fallback warning metadata'
-            }
+            Assert-TraceUnavailableChannelDisabled -Text $result.Text -Context 'physics summary'
         }),
-        (New-SmokeCase -Message "[$([IO.Path]::GetFileName($TracePath))] Verify physics solver-stages returns stage rows..." -Context 'physics solver-stages' -Args @($TracePath, 'physics', 'solver-stages') -MustContain @('"data"') -Validate {
+        (New-SmokeCase -Message "[$([IO.Path]::GetFileName($TracePath))] Verify physics solver-stages reports channel-disabled trace unavailability..." -Context 'physics solver-stages' -Args @($TracePath, 'physics', 'solver-stages') -AllowExitCodes @(10) -Validate {
             param($result)
-            $json = Parse-JsonOutput -Text $result.Text -Context 'physics solver-stages'
-            if ($null -eq $json.data) {
-                throw 'Expected physics solver-stages response to include data array'
-            }
-            if ($json.meta.data_source -ne 'cpu_scope_pattern') {
-                throw 'Expected physics solver-stages meta.data_source=cpu_scope_pattern'
-            }
-            if ([string]::IsNullOrWhiteSpace([string]$json.meta.warning)) {
-                throw 'Expected physics solver-stages fallback warning metadata'
-            }
+            Assert-TraceUnavailableChannelDisabled -Text $result.Text -Context 'physics solver-stages'
         }),
-        (New-SmokeCase -Message "[$([IO.Path]::GetFileName($TracePath))] Verify physics top-bodies supports limit..." -Context 'physics top-bodies' -Args @($TracePath, 'physics', 'top-bodies', '--limit', '3') -MustContain @('"data"') -Validate {
+        (New-SmokeCase -Message "[$([IO.Path]::GetFileName($TracePath))] Verify physics top-bodies reports channel-disabled trace unavailability..." -Context 'physics top-bodies' -Args @($TracePath, 'physics', 'top-bodies', '--limit', '3') -AllowExitCodes @(10) -Validate {
             param($result)
-            $json = Parse-JsonOutput -Text $result.Text -Context 'physics top-bodies'
-            if ($null -eq $json.data) {
-                throw 'Expected physics top-bodies response to include data array'
-            }
-            if ($json.data.Count -gt 3) {
-                throw 'Expected physics top-bodies count <= limit'
-            }
-            if ($json.meta.data_source -ne 'cpu_scope_pattern') {
-                throw 'Expected physics top-bodies meta.data_source=cpu_scope_pattern'
-            }
-            if ([string]::IsNullOrWhiteSpace([string]$json.meta.warning)) {
-                throw 'Expected physics top-bodies fallback warning metadata'
-            }
+            Assert-TraceUnavailableChannelDisabled -Text $result.Text -Context 'physics top-bodies'
         }),
-        (New-SmokeCase -Message "[$([IO.Path]::GetFileName($TracePath))] Verify shaders compile-events returns sorted rows..." -Context 'shaders compile-events' -Args @($TracePath, 'shaders', 'compile-events', '--limit', '3') -MustContain @('"data"') -Validate {
+        (New-SmokeCase -Message "[$([IO.Path]::GetFileName($TracePath))] Verify shaders compile-events reports channel-disabled trace unavailability..." -Context 'shaders compile-events' -Args @($TracePath, 'shaders', 'compile-events', '--limit', '3') -AllowExitCodes @(10) -Validate {
             param($result)
-            $json = Parse-JsonOutput -Text $result.Text -Context 'shaders compile-events'
-            if ($null -eq $json.data) {
-                throw 'Expected shaders compile-events response to include data array'
-            }
-            if ($json.data.Count -gt 3) {
-                throw 'Expected shaders compile-events count <= limit'
-            }
-            if ($json.meta.data_source -ne 'cpu_scope_pattern') {
-                throw 'Expected shaders compile-events meta.data_source=cpu_scope_pattern'
-            }
-            if ([string]::IsNullOrWhiteSpace([string]$json.meta.warning)) {
-                throw 'Expected shaders compile-events fallback warning metadata'
-            }
+            Assert-TraceUnavailableChannelDisabled -Text $result.Text -Context 'shaders compile-events'
         }),
-        (New-SmokeCase -Message "[$([IO.Path]::GetFileName($TracePath))] Verify shaders pso-cache-misses returns summary metrics..." -Context 'shaders pso-cache-misses' -Args @($TracePath, 'shaders', 'pso-cache-misses') -MustContain @('"data"') -Validate {
+        (New-SmokeCase -Message "[$([IO.Path]::GetFileName($TracePath))] Verify shaders pso-cache-misses reports channel-disabled trace unavailability..." -Context 'shaders pso-cache-misses' -Args @($TracePath, 'shaders', 'pso-cache-misses') -AllowExitCodes @(10) -Validate {
             param($result)
-            $json = Parse-JsonOutput -Text $result.Text -Context 'shaders pso-cache-misses'
-            if ($null -eq $json.data) {
-                throw 'Expected shaders pso-cache-misses response to include data object'
-            }
-            foreach ($field in @('miss_scope_count', 'compile_cost_ms', 'top_scope')) {
-                if ($null -eq $json.data.$field) {
-                    throw "Expected shaders pso-cache-misses field: $field"
-                }
-            }
-            if ($json.meta.data_source -ne 'cpu_scope_pattern') {
-                throw 'Expected shaders pso-cache-misses meta.data_source=cpu_scope_pattern'
-            }
-            if ([string]::IsNullOrWhiteSpace([string]$json.meta.warning)) {
-                throw 'Expected shaders pso-cache-misses fallback warning metadata'
-            }
+            Assert-TraceUnavailableChannelDisabled -Text $result.Text -Context 'shaders pso-cache-misses'
         }),
         (New-SmokeCase -Message "[$([IO.Path]::GetFileName($TracePath))] Verify threads waits returns trace-backed wait diagnostics..." -Context 'threads waits' -Args @($TracePath, 'threads', 'waits', '--frame-index', '1', '--limit', '3') -MustContain @('"data"', '"data_source"') -Validate {
             param($result)

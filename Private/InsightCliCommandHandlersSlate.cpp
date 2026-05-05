@@ -112,6 +112,22 @@ double ResolveWindowDurationMs(const FTraceContext& Context, const FResolvedTime
 	const double EndMs = Frames.Last().FrameEndMs;
 	return FMath::Max(0.0, EndMs - StartMs);
 }
+
+FInsightCliResponse MakeSlateChannelDisabledError(const FTraceContext& Context, const TCHAR* Consumer, const TCHAR* Message)
+{
+	TMap<FString, FString> ExtraDetails;
+	ExtraDetails.Add(TEXT("unavailable_reason"), TEXT("channel_disabled"));
+	ExtraDetails.Add(TEXT("data_source"), TEXT("unavailable"));
+	return MakeTraceUnavailableError(
+		Context,
+		Consumer,
+		TEXT("provider"),
+		TEXT("slate channel disabled"),
+		TEXT("provider"),
+		TEXT("slate channel disabled"),
+		Message,
+		ExtraDetails);
+}
 }
 
 bool HandleSlateCommands(const FInsightCliRequest& Request, const FTraceContext& Context, FInsightCliResponse& OutResponse)
@@ -145,6 +161,12 @@ bool HandleSlateCommands(const FInsightCliRequest& Request, const FTraceContext&
 			OutResponse = MakeOptionError(TEXT("--by must be one of: paint, tick, invalidation."));
 			return true;
 		}
+
+		OutResponse = MakeSlateChannelDisabledError(
+			Context,
+			TEXT("slate.top-widgets"),
+			TEXT("Slate trace channel is disabled or unavailable for this trace."));
+		return true;
 
 		TArray<FCpuScopeSample> Rows;
 		FString FailureStage;
@@ -210,6 +232,12 @@ bool HandleSlateCommands(const FInsightCliRequest& Request, const FTraceContext&
 			OutResponse = MakeOptionError(TEXT("frame-index must be >= 0."));
 			return true;
 		}
+
+		OutResponse = MakeSlateChannelDisabledError(
+			Context,
+			TEXT("slate.paint-cost"),
+			TEXT("Slate trace channel is disabled or unavailable for this trace."));
+		return true;
 
 		FInsightCliResponse FrameGuardError;
 		if (!EnsureTraceBackedFrameSamples(Context, FrameGuardError, TEXT("slate.paint-cost")))
@@ -283,6 +311,12 @@ bool HandleSlateCommands(const FInsightCliRequest& Request, const FTraceContext&
 			OutResponse = TimeWindowError;
 			return true;
 		}
+
+		OutResponse = MakeSlateChannelDisabledError(
+			Context,
+			TEXT("slate.invalidation-rate"),
+			TEXT("Slate trace channel is disabled or unavailable for this trace."));
+		return true;
 
 		TArray<FCpuScopeSample> Rows;
 		FString FailureStage;

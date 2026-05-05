@@ -83,6 +83,22 @@ bool BuildNetCpuRows(const FTraceContext& Context, TArray<FCpuScopeSample>& OutR
 
 	return true;
 }
+
+FInsightCliResponse MakeNetChannelDisabledError(const FTraceContext& Context, const TCHAR* Consumer, const TCHAR* Message)
+{
+	TMap<FString, FString> ExtraDetails;
+	ExtraDetails.Add(TEXT("unavailable_reason"), TEXT("channel_disabled"));
+	ExtraDetails.Add(TEXT("data_source"), TEXT("unavailable"));
+	return MakeTraceUnavailableError(
+		Context,
+		Consumer,
+		TEXT("provider"),
+		TEXT("net channel disabled"),
+		TEXT("provider"),
+		TEXT("net channel disabled"),
+		Message,
+		ExtraDetails);
+}
 }
 
 bool HandleNetCommands(const FInsightCliRequest& Request, const FTraceContext& Context, FInsightCliResponse& OutResponse)
@@ -95,6 +111,12 @@ bool HandleNetCommands(const FInsightCliRequest& Request, const FTraceContext& C
 			OutResponse = UnknownOptionError;
 			return true;
 		}
+
+		OutResponse = MakeNetChannelDisabledError(
+			Context,
+			TEXT("net.summary"),
+			TEXT("Net trace channel is disabled or unavailable for this trace."));
+		return true;
 
 		TArray<FCpuScopeSample> NetRows;
 		FString FailureStage;
@@ -153,6 +175,12 @@ bool HandleNetCommands(const FInsightCliRequest& Request, const FTraceContext& C
 			OutResponse = LimitError;
 			return true;
 		}
+
+		OutResponse = MakeNetChannelDisabledError(
+			Context,
+			TEXT("net.top-actors"),
+			TEXT("Net trace channel is disabled or unavailable for this trace."));
+		return true;
 
 		TArray<FCpuScopeSample> NetRows;
 		FString FailureStage;
@@ -226,6 +254,12 @@ bool HandleNetCommands(const FInsightCliRequest& Request, const FTraceContext& C
 			return true;
 		}
 
+		OutResponse = MakeNetChannelDisabledError(
+			Context,
+			TEXT("net.top-rpcs"),
+			TEXT("Net trace channel is disabled or unavailable for this trace."));
+		return true;
+
 		TArray<FCpuScopeSample> NetRows;
 		FString FailureStage;
 		FString FailureReason;
@@ -298,6 +332,12 @@ bool HandleNetCommands(const FInsightCliRequest& Request, const FTraceContext& C
 			OutResponse = TimeWindowError;
 			return true;
 		}
+
+		OutResponse = MakeNetChannelDisabledError(
+			Context,
+			TEXT("net.bandwidth-series"),
+			TEXT("Net trace channel is disabled or unavailable for this trace."));
+		return true;
 
 		FInsightCliResponse FrameGuardError;
 		if (!EnsureTraceBackedFrameSamples(Context, FrameGuardError, TEXT("net.bandwidth-series")))

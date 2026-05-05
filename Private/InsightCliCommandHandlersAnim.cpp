@@ -82,6 +82,22 @@ void AddFallbackMeta(TMap<FString, FString>& Meta, const TCHAR* Warning)
 	Meta.Add(TEXT("data_source"), TEXT("cpu_scope_pattern"));
 	AddMetaWarning(Meta, Warning);
 }
+
+FInsightCliResponse MakeAnimChannelDisabledError(const FTraceContext& Context, const TCHAR* Consumer, const TCHAR* Message)
+{
+	TMap<FString, FString> ExtraDetails;
+	ExtraDetails.Add(TEXT("unavailable_reason"), TEXT("channel_disabled"));
+	ExtraDetails.Add(TEXT("data_source"), TEXT("unavailable"));
+	return MakeTraceUnavailableError(
+		Context,
+		Consumer,
+		TEXT("provider"),
+		TEXT("animation channel disabled"),
+		TEXT("provider"),
+		TEXT("animation channel disabled"),
+		Message,
+		ExtraDetails);
+}
 }
 
 bool HandleAnimCommands(const FInsightCliRequest& Request, const FTraceContext& Context, FInsightCliResponse& OutResponse)
@@ -102,6 +118,12 @@ bool HandleAnimCommands(const FInsightCliRequest& Request, const FTraceContext& 
 			OutResponse = LimitError;
 			return true;
 		}
+
+		OutResponse = MakeAnimChannelDisabledError(
+			Context,
+			TEXT("anim.top-actors"),
+			TEXT("Animation trace channel is disabled or unavailable for this trace."));
+		return true;
 
 		TArray<FCpuScopeSample> CpuRows;
 		FString FailureStage;
@@ -170,6 +192,12 @@ bool HandleAnimCommands(const FInsightCliRequest& Request, const FTraceContext& 
 		{
 			return true;
 		}
+
+		OutResponse = MakeAnimChannelDisabledError(
+			Context,
+			TEXT("anim.graph"),
+			TEXT("Animation trace channel is disabled or unavailable for this trace."));
+		return true;
 
 		TArray<FCpuScopeSample> CpuRows;
 		FString FailureStage;
@@ -253,6 +281,12 @@ bool HandleAnimCommands(const FInsightCliRequest& Request, const FTraceContext& 
 			OutResponse = LimitError;
 			return true;
 		}
+
+		OutResponse = MakeAnimChannelDisabledError(
+			Context,
+			TEXT("anim.skinning"),
+			TEXT("Animation trace channel is disabled or unavailable for this trace."));
+		return true;
 
 		TArray<FCpuScopeSample> CpuRows;
 		FString FailureStage;

@@ -44,6 +44,22 @@ void AddFallbackMeta(TMap<FString, FString>& Meta)
 	Meta.Add(TEXT("data_source"), TEXT("cpu_scope_pattern"));
 	AddMetaWarning(Meta, TEXT("Niagara channel unavailable; values are approximated from CPU scope patterns."));
 }
+
+FInsightCliResponse MakeNiagaraChannelDisabledError(const FTraceContext& Context, const TCHAR* Consumer, const TCHAR* Message)
+{
+	TMap<FString, FString> ExtraDetails;
+	ExtraDetails.Add(TEXT("unavailable_reason"), TEXT("channel_disabled"));
+	ExtraDetails.Add(TEXT("data_source"), TEXT("unavailable"));
+	return MakeTraceUnavailableError(
+		Context,
+		Consumer,
+		TEXT("provider"),
+		TEXT("niagara channel disabled"),
+		TEXT("provider"),
+		TEXT("niagara channel disabled"),
+		Message,
+		ExtraDetails);
+}
 }
 
 bool HandleNiagaraCommands(const FInsightCliRequest& Request, const FTraceContext& Context, FInsightCliResponse& OutResponse)
@@ -64,6 +80,12 @@ bool HandleNiagaraCommands(const FInsightCliRequest& Request, const FTraceContex
 			OutResponse = LimitError;
 			return true;
 		}
+
+		OutResponse = MakeNiagaraChannelDisabledError(
+			Context,
+			TEXT("niagara.top-systems"),
+			TEXT("Niagara trace channel is disabled or unavailable for this trace."));
+		return true;
 
 		TArray<FCpuScopeSample> CpuRows;
 		FString FailureStage;
@@ -146,6 +168,12 @@ bool HandleNiagaraCommands(const FInsightCliRequest& Request, const FTraceContex
 		{
 			return true;
 		}
+
+		OutResponse = MakeNiagaraChannelDisabledError(
+			Context,
+			TEXT("niagara.emitter-cost"),
+			TEXT("Niagara trace channel is disabled or unavailable for this trace."));
+		return true;
 
 		TArray<FCpuScopeSample> CpuRows;
 		FString FailureStage;

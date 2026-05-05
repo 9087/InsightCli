@@ -97,6 +97,22 @@ bool BuildPhysicsRows(const FTraceContext& Context, TArray<FCpuScopeSample>& Out
 
 	return true;
 }
+
+FInsightCliResponse MakePhysicsChannelDisabledError(const FTraceContext& Context, const TCHAR* Consumer, const TCHAR* Message)
+{
+	TMap<FString, FString> ExtraDetails;
+	ExtraDetails.Add(TEXT("unavailable_reason"), TEXT("channel_disabled"));
+	ExtraDetails.Add(TEXT("data_source"), TEXT("unavailable"));
+	return MakeTraceUnavailableError(
+		Context,
+		Consumer,
+		TEXT("provider"),
+		TEXT("physics channel disabled"),
+		TEXT("provider"),
+		TEXT("physics channel disabled"),
+		Message,
+		ExtraDetails);
+}
 }
 
 bool HandlePhysicsCommands(const FInsightCliRequest& Request, const FTraceContext& Context, FInsightCliResponse& OutResponse)
@@ -140,6 +156,12 @@ bool HandlePhysicsCommands(const FInsightCliRequest& Request, const FTraceContex
 				return true;
 			}
 		}
+
+		OutResponse = MakePhysicsChannelDisabledError(
+			Context,
+			TEXT("physics.summary"),
+			TEXT("Physics trace channel is disabled or unavailable for this trace."));
+		return true;
 
 		TArray<FCpuScopeSample> PhysicsRows;
 		FString FailureStage;
@@ -211,6 +233,12 @@ bool HandlePhysicsCommands(const FInsightCliRequest& Request, const FTraceContex
 			OutResponse = UnknownOptionError;
 			return true;
 		}
+
+		OutResponse = MakePhysicsChannelDisabledError(
+			Context,
+			TEXT("physics.solver-stages"),
+			TEXT("Physics trace channel is disabled or unavailable for this trace."));
+		return true;
 
 		TArray<FCpuScopeSample> PhysicsRows;
 		FString FailureStage;
@@ -285,6 +313,12 @@ bool HandlePhysicsCommands(const FInsightCliRequest& Request, const FTraceContex
 			OutResponse = LimitError;
 			return true;
 		}
+
+		OutResponse = MakePhysicsChannelDisabledError(
+			Context,
+			TEXT("physics.top-bodies"),
+			TEXT("Physics trace channel is disabled or unavailable for this trace."));
+		return true;
 
 		TArray<FCpuScopeSample> PhysicsRows;
 		FString FailureStage;

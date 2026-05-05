@@ -55,6 +55,22 @@ bool BuildShaderRows(const FTraceContext& Context, TArray<FCpuScopeSample>& OutR
 	});
 	return true;
 }
+
+FInsightCliResponse MakeShadersChannelDisabledError(const FTraceContext& Context, const TCHAR* Consumer, const TCHAR* Message)
+{
+	TMap<FString, FString> ExtraDetails;
+	ExtraDetails.Add(TEXT("unavailable_reason"), TEXT("channel_disabled"));
+	ExtraDetails.Add(TEXT("data_source"), TEXT("unavailable"));
+	return MakeTraceUnavailableError(
+		Context,
+		Consumer,
+		TEXT("provider"),
+		TEXT("shaders channel disabled"),
+		TEXT("provider"),
+		TEXT("shaders channel disabled"),
+		Message,
+		ExtraDetails);
+}
 }
 
 bool HandleShadersCommands(const FInsightCliRequest& Request, const FTraceContext& Context, FInsightCliResponse& OutResponse)
@@ -75,6 +91,12 @@ bool HandleShadersCommands(const FInsightCliRequest& Request, const FTraceContex
 			OutResponse = LimitError;
 			return true;
 		}
+
+		OutResponse = MakeShadersChannelDisabledError(
+			Context,
+			TEXT("shaders.compile-events"),
+			TEXT("Shader trace channel is disabled or unavailable for this trace."));
+		return true;
 
 		TArray<FCpuScopeSample> ShaderRows;
 		FString FailureStage;
@@ -122,6 +144,12 @@ bool HandleShadersCommands(const FInsightCliRequest& Request, const FTraceContex
 			OutResponse = UnknownOptionError;
 			return true;
 		}
+
+		OutResponse = MakeShadersChannelDisabledError(
+			Context,
+			TEXT("shaders.pso-cache-misses"),
+			TEXT("Shader trace channel is disabled or unavailable for this trace."));
+		return true;
 
 		TArray<FCpuScopeSample> ShaderRows;
 		FString FailureStage;
