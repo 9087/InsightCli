@@ -75,6 +75,8 @@ const FCommandCatalogEntry CommandCatalog[] =
 	{ TEXT("memory"), TEXT("leak-suspect"), &HandleDataCommands, {}, { TEXT("limit") } },
 	{ TEXT("marks"), TEXT("search"), &HandleDataCommands, { TEXT("keyword") }, { TEXT("limit"), TEXT("category"), TEXT("channel"), TEXT("thread-id"), TEXT("case-sensitive"), TEXT("exact"), TEXT("time-start"), TEXT("time-end"), TEXT("frame-range") } },
 	{ TEXT("marks"), TEXT("around"), &HandleDataCommands, { TEXT("at") }, { TEXT("window-ms"), TEXT("limit") } },
+	{ TEXT("marks"), TEXT("regions"), &HandleDataCommands, {}, { TEXT("name") } },
+	{ TEXT("marks"), TEXT("region-slice"), &HandleDataCommands, { TEXT("name") }, {} },
 	{ TEXT("loadtime"), TEXT("summary"), &HandleDataCommands, {}, {} },
 	{ TEXT("loadtime"), TEXT("packages"), &HandleDataCommands, {}, { TEXT("limit"), TEXT("sort-by") } },
 	{ TEXT("loadtime"), TEXT("slowest"), &HandleDataCommands, {}, { TEXT("limit") } },

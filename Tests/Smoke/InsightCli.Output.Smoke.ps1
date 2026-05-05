@@ -1524,6 +1524,52 @@ function Invoke-NormalTraceSmoke {
             if ($frameRangeSearchJson.meta.time_window_source -ne 'frame-range' -or $frameRangeSearchJson.meta.frame_range -ne '1:3') {
                 throw 'Expected marks search frame-range metadata'
             }
+        }),
+        (New-SmokeCase -Message "[$([IO.Path]::GetFileName($TracePath))] Verify marks regions and region-slice return structured outputs..." -Context 'marks regions/region-slice' -Args @($TracePath, 'marks', 'regions') -MustContain @('"data"') -Validate {
+            param($result)
+            $regionsJson = Parse-JsonOutput -Text $result.Text -Context 'marks regions'
+            if ($null -eq $regionsJson.data) {
+                throw 'Expected marks regions response to include data array'
+            }
+
+            if ($regionsJson.data.Count -gt 0) {
+                $targetRegion = $regionsJson.data[0]
+                if ([string]::IsNullOrWhiteSpace([string]$targetRegion.name)) {
+                    throw 'Expected marks regions rows to include non-empty name'
+                }
+                foreach ($field in @('start_ms', 'end_ms', 'duration_ms', 'incomplete')) {
+                    if ($null -eq $targetRegion.$field) {
+                        throw "Expected marks regions row field: $field"
+                    }
+                }
+
+                $sliceResult = Invoke-InsightCli -Args @($TracePath, 'marks', 'region-slice', '--name', [string]$targetRegion.name)
+                if ($sliceResult.ExitCode -ne 0) {
+                    throw 'Expected zero exit code for marks region-slice'
+                }
+                $sliceJson = Parse-JsonOutput -Text $sliceResult.Text -Context 'marks region-slice'
+                if ($null -eq $sliceJson.data) {
+                    throw 'Expected marks region-slice response to include data object'
+                }
+                if ([string]::IsNullOrWhiteSpace([string]$sliceJson.data.name)) {
+                    throw 'Expected marks region-slice data.name'
+                }
+                foreach ($field in @('frame_count', 'frame_time_avg_ms', 'frame_time_max_ms', 'cpu_total_self_ms', 'memory_delta_bytes')) {
+                    if ($null -eq $sliceJson.data.$field) {
+                        throw "Expected marks region-slice metric: $field"
+                    }
+                }
+            }
+            else {
+                $missingSliceResult = Invoke-InsightCli -Args @($TracePath, 'marks', 'region-slice', '--name', '__missing_region__')
+                if ($missingSliceResult.ExitCode -ne 0) {
+                    throw 'Expected zero exit code for marks region-slice not_found path'
+                }
+                $missingSliceJson = Parse-JsonOutput -Text $missingSliceResult.Text -Context 'marks region-slice missing'
+                if ([string]$missingSliceJson.meta.found -ne 'false') {
+                    throw 'Expected marks region-slice missing response meta.found=false'
+                }
+            }
         })
     )
 
