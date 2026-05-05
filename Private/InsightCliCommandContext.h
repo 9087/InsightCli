@@ -192,11 +192,23 @@ struct FResolvedTimeWindowMs
 	}
 };
 
+struct FGlobalOutputOptions
+{
+	TArray<FString> Fields;
+	TOptional<int32> MaxRows;
+
+	bool HasAny() const
+	{
+		return Fields.Num() > 0 || MaxRows.IsSet();
+	}
+};
+
 // Option parsing helpers
 bool TryGetIntOption(const TArray<FString>& Args, const TCHAR* LongName, int32& OutValue);
 bool TryGetDoubleOption(const TArray<FString>& Args, const TCHAR* LongName, double& OutValue);
 bool TryGetStringOption(const TArray<FString>& Args, const TCHAR* LongName, FString& OutValue);
 bool HasOption(const TArray<FString>& Args, const TCHAR* LongName);
+bool TryExtractGlobalOutputOptions(TArray<FString>& InOutArgs, FGlobalOutputOptions& OutOptions, FInsightCliResponse& OutError);
 bool ValidateNoUnknownOptionsWithGlobals(const TArray<FString>& Args, const TArray<FString>& CommandOptionNames, FInsightCliResponse& OutError);
 bool TryGetLimitAndOptionalFrameIndexFilter(const TArray<FString>& Args, int32& OutLimit, int32& OutFrameIndexFilter, bool& bOutHasFrameIndex, FInsightCliResponse& OutError);
 bool TryGetTimeWindowMs(const TArray<FString>& Args, FTimeWindowMs& OutWindow, FInsightCliResponse& OutError);

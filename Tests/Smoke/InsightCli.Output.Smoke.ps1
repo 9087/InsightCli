@@ -330,10 +330,47 @@ function Invoke-NormalTraceSmoke {
         }),
         (New-SmokeCase -Message "[$([IO.Path]::GetFileName($TracePath))] Verify frame-range cannot be combined with explicit time window..." -Context 'frames summary frame-range conflict' -Args @($TracePath, 'frames', 'summary', '--frame-range', '1:3', '--time-start', '0') -MustContain @('"E1003"') -ExpectNonZero),
         (New-SmokeCase -Message "[$([IO.Path]::GetFileName($TracePath))] Verify frames slowest returns frame list..." -Context 'frames slowest' -Args @($TracePath, 'frames', 'slowest', '--limit', '3') -MustContain @('"data"', '"frame_index"'))
+        ,(New-SmokeCase -Message "[$([IO.Path]::GetFileName($TracePath))] Verify frames slowest supports --max-rows truncation..." -Context 'frames slowest max-rows' -Args @($TracePath, 'frames', 'slowest', '--limit', '100', '--max-rows', '5') -MustContain @('"data"', '"truncated"') -Validate {
+            param($result)
+            $json = Parse-JsonOutput -Text $result.Text -Context 'frames slowest max-rows'
+            if ($null -eq $json.data) {
+                throw 'Expected frames slowest max-rows response to include data array'
+            }
+            if ($json.data.Count -ne 5) {
+                throw 'Expected frames slowest --max-rows 5 to return exactly 5 rows'
+            }
+            if ($json.meta.truncated -ne $true) {
+                throw 'Expected frames slowest --max-rows response meta.truncated=true'
+            }
+            if ([int]$json.meta.row_count_actual -lt 5) {
+                throw 'Expected frames slowest --max-rows to include row_count_actual >= 5'
+            }
+        })
     )
 
     $postDetailCases = @(
         (New-SmokeCase -Message "[$([IO.Path]::GetFileName($TracePath))] Verify cpu top returns scope list..." -Context 'cpu top' -Args @($TracePath, 'cpu', 'top', '--thread', 'GameThread', '--limit', '3') -MustContain @('"data"', '"scope_name"')),
+        (New-SmokeCase -Message "[$([IO.Path]::GetFileName($TracePath))] Verify cpu top supports --fields projection..." -Context 'cpu top fields projection' -Args @($TracePath, 'cpu', 'top', '--thread', 'GameThread', '--limit', '3', '--fields', 'scope_name,self_ms,missing_field') -MustContain @('"scope_name"', '"self_ms"', '"fields_missing"') -Validate {
+            param($result)
+            $json = Parse-JsonOutput -Text $result.Text -Context 'cpu top fields projection'
+            if ($null -eq $json.data) {
+                throw 'Expected cpu top fields projection response to include data array'
+            }
+
+            $allowed = @('scope_name', 'self_ms')
+            foreach ($row in $json.data) {
+                $names = @($row.PSObject.Properties.Name)
+                $unexpected = @($names | Where-Object { $allowed -notcontains $_ })
+                if ($unexpected.Count -gt 0) {
+                    throw "Expected cpu top --fields rows to contain only projected fields. Unexpected: $($unexpected -join ',')"
+                }
+            }
+
+            $missing = @($json.meta.fields_missing)
+            if (-not ($missing -contains 'missing_field')) {
+                throw 'Expected cpu top --fields response to include missing_field in meta.fields_missing'
+            }
+        }),
         (New-SmokeCase -Message "[$([IO.Path]::GetFileName($TracePath))] Verify cpu stack top-down view returns trace-backed stack data..." -Context 'cpu stack top-down' -Args @($TracePath, 'cpu', 'stack', '--frame-index', '1', '--thread', 'GameThread', '--view', 'top-down', '--limit', '10') -MustContain @('"data"', '"stack"', '"data_source"') -Validate {
             param($result)
             $json = Parse-JsonOutput -Text $result.Text -Context 'cpu stack top-down'

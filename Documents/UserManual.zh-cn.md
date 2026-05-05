@@ -85,6 +85,9 @@ InsightCli.exe C:/traces/run01.utrace frames summary
 - 未声明的命令参数会被拒绝，返回 `E1003`。
 - 时间窗口统一为左闭右开区间：`[time-start, time-end)`。
 - 很多命令会在 `meta` 中回显元信息（例如：`limit`、`data_source`、过滤参数）。
+- 全局输出选项：
+  - `--fields a,b,c`：对 `data` 行/对象做字段投影。未知字段会被忽略，并在 `meta.fields_missing` 回显。
+  - `--max-rows N`：对 `data` 数组施加软上限。发生截断时会返回 `meta.truncated=true` 与 `meta.row_count_actual`。
 - 在合法查询场景中，`not found` 通常表现为：
   - 退出码 `0`
   - 空 `data`

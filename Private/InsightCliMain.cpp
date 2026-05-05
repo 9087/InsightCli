@@ -475,6 +475,144 @@ FString MakeCondensedJsonLine(const FString& Envelope)
 	return Out;
 }
 
+bool ApplyGlobalOutputOptionsToStdOut(FString& InOutStdOut, const UE::InsightCli::Internal::FGlobalOutputOptions& Options)
+{
+	if (!Options.HasAny() || InOutStdOut.IsEmpty())
+	{
+		return true;
+	}
+
+	FString EnvelopeJson = InOutStdOut;
+	const int32 FirstBrace = EnvelopeJson.Find(TEXT("{"));
+	const int32 LastBrace = EnvelopeJson.Find(TEXT("}"), ESearchCase::CaseSensitive, ESearchDir::FromEnd);
+	if (FirstBrace != INDEX_NONE && LastBrace != INDEX_NONE && LastBrace >= FirstBrace)
+	{
+		EnvelopeJson = EnvelopeJson.Mid(FirstBrace, LastBrace - FirstBrace + 1);
+	}
+
+	EnvelopeJson.ReplaceInline(TEXT(": inf"), TEXT(": null"), ESearchCase::CaseSensitive);
+	EnvelopeJson.ReplaceInline(TEXT(": -inf"), TEXT(": null"), ESearchCase::CaseSensitive);
+	EnvelopeJson.ReplaceInline(TEXT(": nan"), TEXT(": null"), ESearchCase::CaseSensitive);
+	EnvelopeJson.ReplaceInline(TEXT(":inf"), TEXT(":null"), ESearchCase::CaseSensitive);
+	EnvelopeJson.ReplaceInline(TEXT(":-inf"), TEXT(":null"), ESearchCase::CaseSensitive);
+	EnvelopeJson.ReplaceInline(TEXT(":nan"), TEXT(":null"), ESearchCase::CaseSensitive);
+
+	TSharedPtr<FJsonObject> Root;
+	const TSharedRef<TJsonReader<>> Reader = TJsonReaderFactory<>::Create(EnvelopeJson);
+	if (!FJsonSerializer::Deserialize(Reader, Root) || !Root.IsValid())
+	{
+		return false;
+	}
+
+	TSharedPtr<FJsonObject> MetaObject;
+	const TSharedPtr<FJsonValue>* MetaValuePtr = Root->Values.Find(TEXT("meta"));
+	if (MetaValuePtr != nullptr && MetaValuePtr->IsValid() && (*MetaValuePtr)->Type == EJson::Object)
+	{
+		MetaObject = (*MetaValuePtr)->AsObject();
+	}
+	if (!MetaObject.IsValid())
+	{
+		MetaObject = MakeShared<FJsonObject>();
+		Root->SetObjectField(TEXT("meta"), MetaObject.ToSharedRef());
+	}
+
+	auto ProjectObjectFields = [&Options](TSharedRef<FJsonObject> Object, TSet<FString>& OutFoundFields)
+	{
+		if (Options.Fields.IsEmpty())
+		{
+			return;
+		}
+
+		TMap<FString, TSharedPtr<FJsonValue>> ProjectedValues;
+		for (const FString& Field : Options.Fields)
+		{
+			const TSharedPtr<FJsonValue>* Value = Object->Values.Find(Field);
+			if (Value != nullptr)
+			{
+				ProjectedValues.Add(Field, *Value);
+				OutFoundFields.Add(Field);
+			}
+		}
+		Object->Values = MoveTemp(ProjectedValues);
+	};
+
+	const TSharedPtr<FJsonValue>* DataValuePtr = Root->Values.Find(TEXT("data"));
+	if (DataValuePtr == nullptr || !DataValuePtr->IsValid())
+	{
+		return true;
+	}
+
+	TSet<FString> FoundFields;
+	if (Options.Fields.Num() > 0)
+	{
+		if ((*DataValuePtr)->Type == EJson::Object)
+		{
+			TSharedPtr<FJsonObject> DataObject = (*DataValuePtr)->AsObject();
+			if (DataObject.IsValid())
+			{
+				ProjectObjectFields(DataObject.ToSharedRef(), FoundFields);
+			}
+		}
+		else if ((*DataValuePtr)->Type == EJson::Array)
+		{
+			TArray<TSharedPtr<FJsonValue>> DataArray = (*DataValuePtr)->AsArray();
+			for (TSharedPtr<FJsonValue>& RowValue : DataArray)
+			{
+				if (!RowValue.IsValid() || RowValue->Type != EJson::Object)
+				{
+					continue;
+				}
+
+				TSharedPtr<FJsonObject> RowObject = RowValue->AsObject();
+				if (RowObject.IsValid())
+				{
+					ProjectObjectFields(RowObject.ToSharedRef(), FoundFields);
+				}
+			}
+			Root->SetArrayField(TEXT("data"), DataArray);
+		}
+
+		TArray<TSharedPtr<FJsonValue>> MissingFields;
+		for (const FString& RequestedField : Options.Fields)
+		{
+			if (!FoundFields.Contains(RequestedField))
+			{
+				MissingFields.Add(MakeShared<FJsonValueString>(RequestedField));
+			}
+		}
+		if (MissingFields.Num() > 0)
+		{
+			MetaObject->SetArrayField(TEXT("fields_missing"), MissingFields);
+		}
+	}
+
+	DataValuePtr = Root->Values.Find(TEXT("data"));
+	if (Options.MaxRows.IsSet() && DataValuePtr != nullptr && (*DataValuePtr)->Type == EJson::Array)
+	{
+		const TArray<TSharedPtr<FJsonValue>> DataArray = (*DataValuePtr)->AsArray();
+		const int32 RowCountActual = DataArray.Num();
+		const int32 MaxRows = Options.MaxRows.GetValue();
+		if (RowCountActual > MaxRows)
+		{
+			TArray<TSharedPtr<FJsonValue>> TruncatedArray;
+			TruncatedArray.Reserve(MaxRows);
+			for (int32 Index = 0; Index < MaxRows; ++Index)
+			{
+				TruncatedArray.Add(DataArray[Index]);
+			}
+			Root->SetArrayField(TEXT("data"), TruncatedArray);
+			MetaObject->SetBoolField(TEXT("truncated"), true);
+			MetaObject->SetNumberField(TEXT("row_count_actual"), RowCountActual);
+		}
+	}
+
+	FString Updated;
+	const TSharedRef<TJsonWriter<>> Writer = TJsonWriterFactory<>::Create(&Updated);
+	FJsonSerializer::Serialize(Root.ToSharedRef(), Writer);
+	InOutStdOut = MoveTemp(Updated);
+	return true;
+}
+
 UE::InsightCli::FInsightCliResponse RunBatchProgram(int32 ArgC, TCHAR* ArgV[])
 {
 	if (ArgC < 4 || FCString::Stricmp(ArgV[2], TEXT("--batch")) != 0)
@@ -515,7 +653,19 @@ UE::InsightCli::FInsightCliResponse RunBatchProgram(int32 ArgC, TCHAR* ArgV[])
 	int32 MaxExitCode = 0;
 	for (int32 Index = 0; Index < Requests.Num(); ++Index)
 	{
-		const UE::InsightCli::FInsightCliResponse CommandResponse = UE::InsightCli::ExecuteCommandWithSharedContext(Requests[Index], SharedContext);
+		UE::InsightCli::FInsightCliRequest Request = Requests[Index];
+		UE::InsightCli::Internal::FGlobalOutputOptions OutputOptions;
+		UE::InsightCli::FInsightCliResponse OutputOptionError;
+		if (!UE::InsightCli::Internal::TryExtractGlobalOutputOptions(Request.Args, OutputOptions, OutputOptionError))
+		{
+			return OutputOptionError;
+		}
+
+		UE::InsightCli::FInsightCliResponse CommandResponse = UE::InsightCli::ExecuteCommandWithSharedContext(Request, SharedContext);
+		if (CommandResponse.ExitCode == 0)
+		{
+			ApplyGlobalOutputOptionsToStdOut(CommandResponse.StdOut, OutputOptions);
+		}
 		MaxExitCode = FMath::Max(MaxExitCode, CommandResponse.ExitCode);
 
 		const FString Envelope = !CommandResponse.StdOut.IsEmpty() ? CommandResponse.StdOut : CommandResponse.StdErr;
@@ -552,7 +702,19 @@ UE::InsightCli::FInsightCliResponse RunProgram(int32 ArgC, TCHAR* ArgV[])
 		return ParseError;
 	}
 
-	return UE::InsightCli::ExecuteCommand(Request);
+	UE::InsightCli::Internal::FGlobalOutputOptions OutputOptions;
+	UE::InsightCli::FInsightCliResponse OutputOptionError;
+	if (!UE::InsightCli::Internal::TryExtractGlobalOutputOptions(Request.Args, OutputOptions, OutputOptionError))
+	{
+		return OutputOptionError;
+	}
+
+	UE::InsightCli::FInsightCliResponse Response = UE::InsightCli::ExecuteCommand(Request);
+	if (Response.ExitCode == 0)
+	{
+		ApplyGlobalOutputOptionsToStdOut(Response.StdOut, OutputOptions);
+	}
+	return Response;
 }
 }
 

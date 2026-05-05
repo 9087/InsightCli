@@ -87,6 +87,9 @@ Example:
 - Unknown command options are rejected with `E1003`.
 - Time windows use half-open interval semantics: `[time-start, time-end)`.
 - Many commands include metadata in `meta` (for example: `limit`, `data_source`, filter echoes).
+- Global output options:
+  - `--fields a,b,c`: project fields from `data` rows/objects. Unknown fields are ignored and echoed in `meta.fields_missing`.
+  - `--max-rows N`: soft row cap for `data` arrays. When truncation happens, response includes `meta.truncated=true` and `meta.row_count_actual`.
 - `not found` in valid query contexts usually returns:
   - exit code `0`
   - empty `data`

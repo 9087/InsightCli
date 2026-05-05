@@ -282,6 +282,89 @@ bool HasOption(const TArray<FString>& Args, const TCHAR* LongName)
 	return Cache.PresentOptions.Contains(OptionName);
 }
 
+bool TryExtractGlobalOutputOptions(TArray<FString>& InOutArgs, FGlobalOutputOptions& OutOptions, FInsightCliResponse& OutError)
+{
+	OutOptions = FGlobalOutputOptions();
+
+	TArray<FString> FilteredArgs;
+	FilteredArgs.Reserve(InOutArgs.Num());
+
+	auto ParseFieldList = [&OutOptions](const FString& Value)
+	{
+		TArray<FString> RawFields;
+		Value.ParseIntoArray(RawFields, TEXT(","), true);
+		for (FString Field : RawFields)
+		{
+			Field.TrimStartAndEndInline();
+			if (!Field.IsEmpty())
+			{
+				OutOptions.Fields.AddUnique(Field);
+			}
+		}
+	};
+
+	for (int32 Index = 0; Index < InOutArgs.Num(); ++Index)
+	{
+		const FString& Arg = InOutArgs[Index];
+		if (Arg == TEXT("--fields"))
+		{
+			if (Index + 1 >= InOutArgs.Num())
+			{
+				OutError = MakeOptionError(TEXT("--fields requires a comma-separated value list."));
+				return false;
+			}
+
+			const FString Value = InOutArgs[++Index];
+			ParseFieldList(Value);
+			continue;
+		}
+
+		if (Arg.StartsWith(TEXT("--fields=")))
+		{
+			const FString Value = Arg.Mid(9);
+			ParseFieldList(Value);
+			continue;
+		}
+
+		if (Arg == TEXT("--max-rows"))
+		{
+			if (Index + 1 >= InOutArgs.Num())
+			{
+				OutError = MakeOptionError(TEXT("--max-rows requires a positive integer value."));
+				return false;
+			}
+
+			int32 ParsedMaxRows = 0;
+			if (!TryParseInt(InOutArgs[++Index], ParsedMaxRows) || ParsedMaxRows <= 0)
+			{
+				OutError = MakeOptionError(TEXT("--max-rows must be > 0."));
+				return false;
+			}
+
+			OutOptions.MaxRows = ParsedMaxRows;
+			continue;
+		}
+
+		if (Arg.StartsWith(TEXT("--max-rows=")))
+		{
+			int32 ParsedMaxRows = 0;
+			if (!TryParseInt(Arg.Mid(11), ParsedMaxRows) || ParsedMaxRows <= 0)
+			{
+				OutError = MakeOptionError(TEXT("--max-rows must be > 0."));
+				return false;
+			}
+
+			OutOptions.MaxRows = ParsedMaxRows;
+			continue;
+		}
+
+		FilteredArgs.Add(Arg);
+	}
+
+	InOutArgs = MoveTemp(FilteredArgs);
+	return true;
+}
+
 bool ValidateNoUnknownOptionsWithGlobals(const TArray<FString>& Args, const TArray<FString>& CommandOptionNames, FInsightCliResponse& OutError)
 {
 	const FOptionCache& Cache = GetOptionCache(Args);
