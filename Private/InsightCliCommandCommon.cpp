@@ -255,6 +255,17 @@ FString MakeEnvelopeWithObject(const TSharedRef<FJsonObject>& Data, const TMap<F
 	return SerializeJson(Root);
 }
 
+FString MakeEnvelopeWithObjectAndMeta(const TSharedRef<FJsonObject>& Data, const TSharedPtr<FJsonObject>& MetaObject)
+{
+	const TSharedRef<FJsonObject> Root = MakeShared<FJsonObject>();
+	Root->SetObjectField(TEXT("data"), Data);
+	if (MetaObject.IsValid() && MetaObject->Values.Num() > 0)
+	{
+		Root->SetObjectField(TEXT("meta"), MetaObject.ToSharedRef());
+	}
+	return SerializeJson(Root);
+}
+
 FString MakeEnvelopeWithArray(const TArray<TSharedPtr<FJsonValue>>& Data, const TMap<FString, FString>& Meta)
 {
 	const TSharedRef<FJsonObject> Root = MakeShared<FJsonObject>();

@@ -115,19 +115,26 @@ Sample output:
     "start_timestamp": "2026-05-02T16:08:28Z",
     "start_timestamp_source": "recorded_at_file_mtime",
     "end_timestamp": "2026-05-02T16:08:32Z",
-    "duration_ms": "4220.000",
-    "thread_count": "14",
-    "event_count": "unavailable",
+    "duration_ms": 4220.0,
+    "thread_count": 14,
+    "event_count": null,
     "event_count_reason": "trace_event_count_not_exposed",
-    "build_version": "unavailable",
+    "build_version": null,
     "build_version_reason": "trace_build_version_not_exposed"
+  },
+  "meta": {
+    "unavailable_fields": [
+      "event_count",
+      "build_version"
+    ]
   }
 }
 ```
 
 Notes:
 - start_timestamp is derived from trace file mtime and is an approximate recording start marker.
-- end_timestamp is computed as start_timestamp + duration_ms; when duration_ms is zero, end_timestamp is unavailable.
+- end_timestamp is computed as start_timestamp + duration_ms; when duration_ms is zero, end_timestamp is null.
+- unavailable values are encoded as JSON null, and field names are listed in meta.unavailable_fields.
 - `thread_id = -1` means the field is unspecified for that row and does not map to a concrete trace thread id.
 
 ## 5.2 `frames summary`

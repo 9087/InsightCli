@@ -230,7 +230,7 @@ bool EnsureTraceBackedFrameSamples(const FTraceContext& Context, FInsightCliResp
 void ApplyTimeWindowFilter(TArray<FFrameSample>& Frames, const FResolvedTimeWindowMs& TimeWindow);
 
 // JSON builders: info + frames
-TSharedRef<FJsonObject> MakeInfoSummaryData(const FTraceContext& Context);
+TSharedRef<FJsonObject> MakeInfoSummaryData(const FTraceContext& Context, TArray<FString>& OutUnavailableFields);
 TSharedRef<FJsonObject> MakeInfoChannelsData(const FTraceContext& Context, TMap<FString, FString>& OutMeta);
 TSharedRef<FJsonObject> MakeFramesSummaryData(const TArray<FFrameSample>& Frames);
 TSharedRef<FJsonObject> MakeFrameObject(const FFrameSample& Sample);
@@ -344,6 +344,7 @@ TSharedRef<FJsonObject> MakeMarkObject(const FMarkSample& Mark);
 
 // Response envelope helpers
 FString MakeEnvelopeWithObject(const TSharedRef<FJsonObject>& Data, const TMap<FString, FString>& Meta = {});
+FString MakeEnvelopeWithObjectAndMeta(const TSharedRef<FJsonObject>& Data, const TSharedPtr<FJsonObject>& MetaObject);
 FString MakeEnvelopeWithArray(const TArray<TSharedPtr<FJsonValue>>& Data, const TMap<FString, FString>& Meta = {});
 
 // Group handlers: info + frames

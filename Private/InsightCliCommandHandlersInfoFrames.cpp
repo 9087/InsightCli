@@ -206,7 +206,23 @@ bool HandleInfoAndFramesCommands(const FInsightCliRequest& Request, const FTrace
 			return true;
 		}
 
-		OutResponse = FInsightCliResponse::Ok(MakeEnvelopeWithObject(MakeInfoSummaryData(Context)));
+		TArray<FString> UnavailableFields;
+		const TSharedRef<FJsonObject> Data = MakeInfoSummaryData(Context, UnavailableFields);
+
+		TSharedPtr<FJsonObject> MetaObject;
+		if (UnavailableFields.Num() > 0)
+		{
+			MetaObject = MakeShared<FJsonObject>();
+			TArray<TSharedPtr<FJsonValue>> UnavailableFieldValues;
+			UnavailableFieldValues.Reserve(UnavailableFields.Num());
+			for (const FString& FieldName : UnavailableFields)
+			{
+				UnavailableFieldValues.Add(MakeShared<FJsonValueString>(FieldName));
+			}
+			MetaObject->SetArrayField(TEXT("unavailable_fields"), UnavailableFieldValues);
+		}
+
+		OutResponse = FInsightCliResponse::Ok(MakeEnvelopeWithObjectAndMeta(Data, MetaObject));
 		return true;
 	}
 

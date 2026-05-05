@@ -113,19 +113,26 @@ InsightCli.exe C:/traces/run01.utrace info summary
     "start_timestamp": "2026-05-02T16:08:28Z",
     "start_timestamp_source": "recorded_at_file_mtime",
     "end_timestamp": "2026-05-02T16:08:32Z",
-    "duration_ms": "4220.000",
-    "thread_count": "14",
-    "event_count": "unavailable",
+    "duration_ms": 4220.0,
+    "thread_count": 14,
+    "event_count": null,
     "event_count_reason": "trace_event_count_not_exposed",
-    "build_version": "unavailable",
+    "build_version": null,
     "build_version_reason": "trace_build_version_not_exposed"
+  },
+  "meta": {
+    "unavailable_fields": [
+      "event_count",
+      "build_version"
+    ]
   }
 }
 ```
 
 说明：
 - start_timestamp 来自 trace 文件 mtime，表示近似录制起点。
-- end_timestamp 由 start_timestamp + duration_ms 推导；当 duration_ms 为 0 时，end_timestamp 为 unavailable。
+- end_timestamp 由 start_timestamp + duration_ms 推导；当 duration_ms 为 0 时，end_timestamp 为 null。
+- 不可用字段统一编码为 JSON null，并在 meta.unavailable_fields 中列出字段名。
 - `thread_id = -1` 表示该行字段未指定（unspecified），不对应具体的 trace 线程 ID。
 
 ## 5.2 `frames summary`

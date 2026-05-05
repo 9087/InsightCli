@@ -207,6 +207,39 @@ function Invoke-NormalTraceSmoke {
                 throw 'Expected info summary to include duration_ms'
             }
 
+            if ($json.data.duration_ms -is [string]) {
+                throw 'Expected info summary duration_ms to be numeric JSON type, not string'
+            }
+            if ($json.data.trace_size_bytes -is [string]) {
+                throw 'Expected info summary trace_size_bytes to be numeric JSON type, not string'
+            }
+            if ($null -ne $json.data.thread_count -and $json.data.thread_count -is [string]) {
+                throw 'Expected info summary thread_count to be numeric or null, not string'
+            }
+
+            if ($null -ne $json.data.event_count) {
+                throw 'Expected info summary event_count to be null when unavailable'
+            }
+            if ($null -ne $json.data.build_version) {
+                throw 'Expected info summary build_version to be null when unavailable'
+            }
+
+            if ($null -eq $json.meta -or $null -eq $json.meta.unavailable_fields) {
+                throw 'Expected info summary response to include meta.unavailable_fields'
+            }
+
+            $unavailable = @($json.meta.unavailable_fields)
+            if ($unavailable.Count -lt 2) {
+                throw 'Expected info summary meta.unavailable_fields to contain unavailable field names'
+            }
+
+            if (-not ($unavailable -contains 'event_count')) {
+                throw 'Expected info summary meta.unavailable_fields to include event_count'
+            }
+            if (-not ($unavailable -contains 'build_version')) {
+                throw 'Expected info summary meta.unavailable_fields to include build_version'
+            }
+
             $durationMs = [double]$json.data.duration_ms
             if ($durationMs -gt 0.0) {
                 if ($null -eq $json.data.end_timestamp -or [string]::IsNullOrWhiteSpace([string]$json.data.end_timestamp)) {
@@ -216,8 +249,8 @@ function Invoke-NormalTraceSmoke {
                     throw 'Expected end_timestamp to differ from start_timestamp when duration_ms > 0'
                 }
             }
-            elseif ([string]$json.data.end_timestamp -ne 'unavailable') {
-                throw 'Expected end_timestamp to be unavailable when duration_ms == 0'
+            elseif ($null -ne $json.data.end_timestamp) {
+                throw 'Expected end_timestamp to be null when duration_ms == 0'
             }
         }),
         (New-SmokeCase -Message "[$([IO.Path]::GetFileName($TracePath))] Verify info channels returns channel catalog..." -Context 'info channels' -Args @($TracePath, 'info', 'channels') -MustContain @('"data"', '"channels"') -Validate {
