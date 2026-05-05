@@ -29,6 +29,165 @@ bool IsHelpToken(const TCHAR* Token)
 		|| FCString::Stricmp(Token, TEXT("-h")) == 0;
 }
 
+bool IsSchemaToken(const TCHAR* Token)
+{
+	return FCString::Stricmp(Token, TEXT("schema")) == 0;
+}
+
+bool IsBoolOptionName(const FString& OptionName)
+{
+	return OptionName == TEXT("case-sensitive") || OptionName == TEXT("exact");
+}
+
+TSharedRef<FJsonObject> MakeOptionSchemaObject(const FString& OptionName, bool bRequired)
+{
+	const TSharedRef<FJsonObject> OptionObject = MakeShared<FJsonObject>();
+	OptionObject->SetStringField(TEXT("name"), OptionName);
+	OptionObject->SetStringField(TEXT("type"), IsBoolOptionName(OptionName) ? TEXT("boolean") : TEXT("string"));
+	OptionObject->SetBoolField(TEXT("required"), bRequired);
+	if (!bRequired)
+	{
+		OptionObject->SetField(TEXT("default"), MakeShared<FJsonValueNull>());
+	}
+	return OptionObject;
+}
+
+TSharedRef<FJsonObject> MakeCommandSchemaEntry(const UE::InsightCli::FInsightCliCommandCatalogEntry& Entry)
+{
+	const TSharedRef<FJsonObject> Item = MakeShared<FJsonObject>();
+	Item->SetStringField(TEXT("command"), FString::Printf(TEXT("%s %s"), *Entry.Group, *Entry.Action));
+	Item->SetStringField(TEXT("group"), Entry.Group);
+	Item->SetStringField(TEXT("action"), Entry.Action);
+
+	TArray<TSharedPtr<FJsonValue>> RequiredOptions;
+	RequiredOptions.Reserve(Entry.RequiredOptions.Num());
+	for (const FString& Option : Entry.RequiredOptions)
+	{
+		RequiredOptions.Add(MakeShared<FJsonValueString>(Option));
+	}
+
+	TArray<TSharedPtr<FJsonValue>> OptionalOptions;
+	OptionalOptions.Reserve(Entry.OptionalOptions.Num());
+	for (const FString& Option : Entry.OptionalOptions)
+	{
+		OptionalOptions.Add(MakeShared<FJsonValueString>(Option));
+	}
+
+	const TSharedRef<FJsonObject> InputSchema = MakeShared<FJsonObject>();
+	InputSchema->SetStringField(TEXT("type"), TEXT("object"));
+	InputSchema->SetStringField(TEXT("trace_path"), TEXT("string"));
+	InputSchema->SetArrayField(TEXT("required_options"), RequiredOptions);
+	InputSchema->SetArrayField(TEXT("optional_options"), OptionalOptions);
+
+	TArray<TSharedPtr<FJsonValue>> OptionSchemas;
+	OptionSchemas.Reserve(Entry.RequiredOptions.Num() + Entry.OptionalOptions.Num());
+	for (const FString& Option : Entry.RequiredOptions)
+	{
+		OptionSchemas.Add(MakeShared<FJsonValueObject>(MakeOptionSchemaObject(Option, true)));
+	}
+	for (const FString& Option : Entry.OptionalOptions)
+	{
+		OptionSchemas.Add(MakeShared<FJsonValueObject>(MakeOptionSchemaObject(Option, false)));
+	}
+	InputSchema->SetArrayField(TEXT("options"), OptionSchemas);
+
+	const TSharedRef<FJsonObject> OutputSchema = MakeShared<FJsonObject>();
+	OutputSchema->SetStringField(TEXT("type"), TEXT("object"));
+	OutputSchema->SetStringField(TEXT("envelope"), TEXT("{ \"data\": object|array, \"meta\"?: object }"));
+	OutputSchema->SetStringField(TEXT("data"), TEXT("command-specific payload"));
+	OutputSchema->SetStringField(TEXT("meta"), TEXT("command-specific metadata"));
+
+	Item->SetObjectField(TEXT("input_schema"), InputSchema);
+	Item->SetObjectField(TEXT("output_schema_summary"), OutputSchema);
+	return Item;
+}
+
+bool TryParseSchemaCommandFilter(int32 ArgC, TCHAR* ArgV[], FString& OutGroup, FString& OutAction, UE::InsightCli::FInsightCliResponse& OutError)
+{
+	OutGroup.Reset();
+	OutAction.Reset();
+
+	if (ArgC == 2)
+	{
+		return true;
+	}
+
+	if (ArgC != 4 || FCString::Stricmp(ArgV[2], TEXT("--command")) != 0)
+	{
+		OutError = UE::InsightCli::Internal::MakeOptionError(TEXT("schema usage: insight-cli schema [--command \"<group> <action>\"]"));
+		return false;
+	}
+
+	FString CommandText = ArgV[3];
+	CommandText.TrimStartAndEndInline();
+	FString Left;
+	FString Right;
+	if (!CommandText.Split(TEXT(" "), &Left, &Right))
+	{
+		OutError = UE::InsightCli::Internal::MakeOptionError(TEXT("--command must be \"<group> <action>\"."));
+		return false;
+	}
+
+	OutGroup = Left.TrimStartAndEnd();
+	OutAction = Right.TrimStartAndEnd();
+	if (OutGroup.IsEmpty() || OutAction.IsEmpty() || OutAction.Contains(TEXT(" ")))
+	{
+		OutError = UE::InsightCli::Internal::MakeOptionError(TEXT("--command must be \"<group> <action>\"."));
+		return false;
+	}
+
+	return true;
+}
+
+UE::InsightCli::FInsightCliResponse MakeTopLevelSchemaResponse(int32 ArgC, TCHAR* ArgV[])
+{
+	FString FilterGroup;
+	FString FilterAction;
+	UE::InsightCli::FInsightCliResponse ParseError;
+	if (!TryParseSchemaCommandFilter(ArgC, ArgV, FilterGroup, FilterAction, ParseError))
+	{
+		return ParseError;
+	}
+
+	TArray<TSharedPtr<FJsonValue>> Schemas;
+	Schemas.Reserve(64);
+	int32 MatchedCount = 0;
+	UE::InsightCli::EnumerateCommandCatalog([&Schemas, &MatchedCount, &FilterGroup, &FilterAction](const UE::InsightCli::FInsightCliCommandCatalogEntry& Entry)
+	{
+		if (!FilterGroup.IsEmpty())
+		{
+			if (!Entry.Group.Equals(FilterGroup, ESearchCase::IgnoreCase) || !Entry.Action.Equals(FilterAction, ESearchCase::IgnoreCase))
+			{
+				return;
+			}
+		}
+
+		Schemas.Add(MakeShared<FJsonValueObject>(MakeCommandSchemaEntry(Entry)));
+		++MatchedCount;
+	});
+
+	if (!FilterGroup.IsEmpty() && MatchedCount == 0)
+	{
+		TMap<FString, FString> Details;
+		Details.Add(TEXT("command"), FString::Printf(TEXT("%s %s"), *FilterGroup, *FilterAction));
+		return UE::InsightCli::Internal::MakeNotFoundError(TEXT("schema command not found."), Details);
+	}
+
+	const TSharedRef<FJsonObject> Data = MakeShared<FJsonObject>();
+	Data->SetStringField(TEXT("$schema"), TEXT("https://json-schema.org/draft/2020-12/schema"));
+	Data->SetArrayField(TEXT("commands"), Schemas);
+
+	TMap<FString, FString> Meta;
+	Meta.Add(TEXT("schema_type"), TEXT("command_catalog"));
+	Meta.Add(TEXT("command_count"), FString::FromInt(MatchedCount));
+	if (!FilterGroup.IsEmpty())
+	{
+		Meta.Add(TEXT("command"), FString::Printf(TEXT("%s %s"), *FilterGroup, *FilterAction));
+	}
+
+	return UE::InsightCli::FInsightCliResponse::Ok(UE::InsightCli::Internal::MakeEnvelopeWithObject(Data, Meta));
+}
+
 UE::InsightCli::FInsightCliResponse MakeTopLevelHelpResponse()
 {
 	TArray<TSharedPtr<FJsonValue>> Commands;
@@ -70,12 +229,24 @@ bool TryHandleTopLevelCommand(int32 ArgC, TCHAR* ArgV[], UE::InsightCli::FInsigh
 {
 	if (ArgC != 2)
 	{
+		if (ArgC >= 2 && IsSchemaToken(ArgV[1]))
+		{
+			OutResponse = MakeTopLevelSchemaResponse(ArgC, ArgV);
+			return true;
+		}
+
 		return false;
 	}
 
 	if (IsHelpToken(ArgV[1]))
 	{
 		OutResponse = MakeTopLevelHelpResponse();
+		return true;
+	}
+
+	if (IsSchemaToken(ArgV[1]))
+	{
+		OutResponse = MakeTopLevelSchemaResponse(ArgC, ArgV);
 		return true;
 	}
 

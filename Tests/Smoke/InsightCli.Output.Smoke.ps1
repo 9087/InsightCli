@@ -1505,6 +1505,28 @@ function Invoke-TopLevelSmoke {
             if ($null -eq $json.data -or $json.data.Count -lt 1) {
                 throw 'Expected top-level --help to return non-empty command catalog array'
             }
+        }),
+        (New-SmokeCase -Message "Verify top-level schema returns schema catalog..." -Context 'top-level schema' -Args @('schema') -MustContain @('"commands"', '"input_schema"', '"output_schema_summary"') -Validate {
+            param($result)
+            $json = Parse-JsonOutput -Text $result.Text -Context 'top-level schema'
+            if ($null -eq $json.data -or [string]::IsNullOrWhiteSpace([string]$json.data.'$schema')) {
+                throw 'Expected top-level schema to include data.$schema'
+            }
+            if ($null -eq $json.data.commands -or $json.data.commands.Count -lt 1) {
+                throw 'Expected top-level schema to include non-empty data.commands'
+            }
+        }),
+        (New-SmokeCase -Message "Verify top-level schema --command filter works..." -Context 'top-level schema --command' -Args @('schema', '--command', 'cpu top') -MustContain @('"commands"', '"command_count"') -Validate {
+            param($result)
+            $json = Parse-JsonOutput -Text $result.Text -Context 'top-level schema --command'
+            if ($null -eq $json.data.commands -or $json.data.commands.Count -ne 1) {
+                throw 'Expected top-level schema --command to return exactly one command schema'
+            }
+
+            $item = $json.data.commands[0]
+            if ([string]$item.group -ne 'cpu' -or [string]$item.action -ne 'top') {
+                throw 'Expected top-level schema --command to return cpu top schema'
+            }
         })
     )
 
