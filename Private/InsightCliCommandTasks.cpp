@@ -9,18 +9,146 @@
 
 namespace UE::InsightCli::Internal
 {
+namespace
+{
+enum class ETaskVisitState : uint8
+{
+	NotVisited,
+	Visiting,
+	Done,
+};
+
+struct FTaskCriticalPathResult
+{
+	double CompletionMs = 0.0;
+	TArray<int32> Chain;
+	bool bCycle = false;
+	bool bPartial = false;
+};
+
+uint64 MakeCycleEdgeKey(const int32 FromTaskId, const int32 ToTaskId)
+{
+	return (static_cast<uint64>(static_cast<uint32>(FromTaskId)) << 32) | static_cast<uint32>(ToTaskId);
+}
+
+bool ComputeTaskCriticalPath(
+	const int32 TaskId,
+	const TMap<int32, int32>& TaskIndexById,
+	const TArray<FTaskSample>& Tasks,
+	TMap<int32, ETaskVisitState>& VisitState,
+	TMap<int32, FTaskCriticalPathResult>& Memo,
+	TSet<uint64>& CycleEdges)
+{
+	if (const ETaskVisitState* ExistingState = VisitState.Find(TaskId))
+	{
+		if (*ExistingState == ETaskVisitState::Done)
+		{
+			return true;
+		}
+		if (*ExistingState == ETaskVisitState::Visiting)
+		{
+			return false;
+		}
+	}
+
+	const int32* TaskIndexPtr = TaskIndexById.Find(TaskId);
+	if (TaskIndexPtr == nullptr)
+	{
+		return true;
+	}
+
+	const FTaskSample& Task = Tasks[*TaskIndexPtr];
+	VisitState.Add(TaskId, ETaskVisitState::Visiting);
+
+	FTaskCriticalPathResult Result;
+	double BestParentCompletionMs = -1.0;
+	TArray<int32> BestParentChain;
+
+	for (const int32 DependencyId : Task.DependencyTaskIds)
+	{
+		const int32* DependencyIndexPtr = TaskIndexById.Find(DependencyId);
+		if (DependencyIndexPtr == nullptr)
+		{
+			Result.bPartial = true;
+			continue;
+		}
+
+		const ETaskVisitState* DependencyState = VisitState.Find(DependencyId);
+		if (DependencyState != nullptr && *DependencyState == ETaskVisitState::Visiting)
+		{
+			Result.bCycle = true;
+			CycleEdges.Add(MakeCycleEdgeKey(DependencyId, TaskId));
+			continue;
+		}
+
+		if (!ComputeTaskCriticalPath(DependencyId, TaskIndexById, Tasks, VisitState, Memo, CycleEdges))
+		{
+			Result.bCycle = true;
+			CycleEdges.Add(MakeCycleEdgeKey(DependencyId, TaskId));
+			continue;
+		}
+
+		const FTaskCriticalPathResult* ParentResult = Memo.Find(DependencyId);
+		if (ParentResult == nullptr)
+		{
+			Result.bPartial = true;
+			continue;
+		}
+
+		const FTaskSample& ParentTask = Tasks[*DependencyIndexPtr];
+		const double EdgeWaitMs = FMath::Max(0.0, Task.StartMs - ParentTask.EndMs);
+		const double CandidateParentCompletionMs = ParentResult->CompletionMs + EdgeWaitMs;
+
+		if (ParentResult->bCycle)
+		{
+			Result.bCycle = true;
+		}
+		if (ParentResult->bPartial)
+		{
+			Result.bPartial = true;
+		}
+
+		if (CandidateParentCompletionMs > BestParentCompletionMs
+			|| (CandidateParentCompletionMs == BestParentCompletionMs && ParentResult->Chain.Num() > BestParentChain.Num()))
+		{
+			BestParentCompletionMs = CandidateParentCompletionMs;
+			BestParentChain = ParentResult->Chain;
+		}
+	}
+
+	Result.CompletionMs = Task.RunMs;
+	if (BestParentCompletionMs >= 0.0)
+	{
+		Result.CompletionMs += BestParentCompletionMs;
+	}
+	else if (Task.DependencyTaskIds.Num() > 0)
+	{
+		Result.bPartial = true;
+	}
+
+	Result.Chain = MoveTemp(BestParentChain);
+	Result.Chain.Add(TaskId);
+
+	VisitState.Add(TaskId, ETaskVisitState::Done);
+	Memo.Add(TaskId, MoveTemp(Result));
+	return true;
+}
+}
+
 bool BuildTaskTopSamples(
 	const FTraceContext& Context,
 	TOptional<int32> FrameIndexFilter,
 	TArray<FTaskSample>& OutSamples,
 	FString& OutFailureStage,
 	FString& OutFailureReason,
-	bool& bOutFrameFound)
+	bool& bOutFrameFound,
+	int32& OutCycleCount)
 {
 	OutSamples.Reset();
 	OutFailureStage.Reset();
 	OutFailureReason.Reset();
 	bOutFrameFound = true;
+	OutCycleCount = 0;
 
 	TOptional<double> IntervalStartSec;
 	TOptional<double> IntervalEndSec;
@@ -125,6 +253,60 @@ bool BuildTaskTopSamples(
 				OutSamples.Add(MoveTemp(Task));
 				return TraceServices::ETaskEnumerationResult::Continue;
 			});
+	}
+
+	TMap<int32, int32> TaskIndexById;
+	TaskIndexById.Reserve(OutSamples.Num());
+	for (int32 Index = 0; Index < OutSamples.Num(); ++Index)
+	{
+		TaskIndexById.Add(OutSamples[Index].TaskId, Index);
+	}
+
+	TMap<int32, ETaskVisitState> VisitState;
+	TMap<int32, FTaskCriticalPathResult> Memo;
+	TSet<uint64> CycleEdges;
+	VisitState.Reserve(OutSamples.Num());
+	Memo.Reserve(OutSamples.Num());
+
+	for (const FTaskSample& Task : OutSamples)
+	{
+		ComputeTaskCriticalPath(Task.TaskId, TaskIndexById, OutSamples, VisitState, Memo, CycleEdges);
+	}
+
+	OutCycleCount = CycleEdges.Num();
+
+	for (FTaskSample& Task : OutSamples)
+	{
+		const FTaskCriticalPathResult* Result = Memo.Find(Task.TaskId);
+		if (Result == nullptr)
+		{
+			Task.CriticalPathTaskChain = { Task.TaskId };
+			Task.CriticalPathDepth = 0;
+			Task.CriticalPathMs = Task.RunMs;
+			Task.DependencyStatus = TEXT("partial");
+			Task.DependencyIssue = TEXT("critical path computation unavailable");
+			continue;
+		}
+
+		Task.CriticalPathTaskChain = Result->Chain;
+		Task.CriticalPathDepth = FMath::Max(0, Result->Chain.Num() - 1);
+		Task.CriticalPathMs = Result->CompletionMs;
+
+		if (Result->bCycle)
+		{
+			Task.DependencyStatus = TEXT("cycle");
+			Task.DependencyIssue = TEXT("cycle detected in task prerequisites");
+		}
+		else if (Result->bPartial)
+		{
+			Task.DependencyStatus = TEXT("partial");
+			Task.DependencyIssue = TEXT("missing prerequisite task samples");
+		}
+		else
+		{
+			Task.DependencyStatus = TEXT("resolved");
+			Task.DependencyIssue.Reset();
+		}
 	}
 
 	OutSamples.Sort([](const FTaskSample& A, const FTaskSample& B)

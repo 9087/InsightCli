@@ -299,7 +299,8 @@ bool BuildTaskTopSamples(
 	TArray<FTaskSample>& OutSamples,
 	FString& OutFailureStage,
 	FString& OutFailureReason,
-	bool& bOutFrameFound);
+	bool& bOutFrameFound,
+	int32& OutCycleCount);
 TSharedRef<FJsonObject> MakeTaskObject(const FTaskSample& Task);
 
 // JSON/data builders: symbols + counters

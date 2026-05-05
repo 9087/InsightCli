@@ -757,6 +757,9 @@ function Invoke-NormalTraceSmoke {
             if ($json.data.Count -gt 3) {
                 throw 'Expected tasks top result count <= limit'
             }
+            if ($json.meta.algorithm -ne 'dag_longest_path') {
+                throw 'Expected tasks top meta.algorithm=dag_longest_path'
+            }
             foreach ($item in $json.data) {
                 if ($null -eq $item.task_id) {
                     throw 'Expected task_id for each tasks top row when data is non-empty'
@@ -764,6 +767,12 @@ function Invoke-NormalTraceSmoke {
                 if ($null -eq $item.queue_wait_ms) {
                     throw 'Expected queue_wait_ms for each tasks top row when data is non-empty'
                 }
+                if ([double]$item.critical_path_ms -lt [double]$item.run_ms) {
+                    throw 'Expected critical_path_ms >= run_ms for each tasks top row'
+                }
+            }
+            if ($json.data.Count -gt 0 -and -not ($json.data | Where-Object { [int]$_.critical_path_depth -ge 1 })) {
+                throw 'Expected at least one tasks top row with critical_path_depth >= 1'
             }
             if ($json.data.Count -gt 0) {
                 Assert-Descending -Items $json.data -Property 'queue_wait_ms' -Context 'tasks top'
@@ -777,6 +786,9 @@ function Invoke-NormalTraceSmoke {
             }
             if ($json.meta.data_source -ne 'trace') {
                 throw 'Expected tasks critical-path meta.data_source=trace'
+            }
+            if ($json.meta.algorithm -ne 'dag_longest_path') {
+                throw 'Expected tasks critical-path meta.algorithm=dag_longest_path'
             }
             if ($json.meta.frame_index -ne '1') {
                 throw 'Expected tasks critical-path meta.frame_index=1'

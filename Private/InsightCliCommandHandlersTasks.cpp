@@ -4,85 +4,6 @@
 
 namespace UE::InsightCli::Internal
 {
-namespace
-{
-struct FTaskPathCandidate
-{
-	TArray<int32> TaskIds;
-	double TotalDurationMs = 0.0;
-	bool bPartial = false;
-};
-
-bool BuildLongestPathForTask(
-	const int32 TaskId,
-	const TMap<int32, const FTaskSample*>& TaskMap,
-	TMap<int32, FTaskPathCandidate>& Memo,
-	TSet<int32>& Visiting,
-	FTaskPathCandidate& OutCandidate)
-{
-	if (const FTaskPathCandidate* Existing = Memo.Find(TaskId))
-	{
-		OutCandidate = *Existing;
-		return true;
-	}
-
-	if (Visiting.Contains(TaskId))
-	{
-		OutCandidate.TaskIds = { TaskId };
-		OutCandidate.TotalDurationMs = 0.0;
-		OutCandidate.bPartial = true;
-		Memo.Add(TaskId, OutCandidate);
-		return true;
-	}
-
-	const FTaskSample* Task = TaskMap.FindRef(TaskId);
-	if (Task == nullptr)
-	{
-		OutCandidate.TaskIds = { TaskId };
-		OutCandidate.TotalDurationMs = 0.0;
-		OutCandidate.bPartial = true;
-		Memo.Add(TaskId, OutCandidate);
-		return true;
-	}
-
-	Visiting.Add(TaskId);
-
-	FTaskPathCandidate BestParent;
-	BestParent.TaskIds.Reset();
-	BestParent.TotalDurationMs = 0.0;
-	BestParent.bPartial = false;
-
-	for (const int32 DependencyId : Task->DependencyTaskIds)
-	{
-		FTaskPathCandidate ParentCandidate;
-		if (!BuildLongestPathForTask(DependencyId, TaskMap, Memo, Visiting, ParentCandidate))
-		{
-			continue;
-		}
-
-		if (!TaskMap.Contains(DependencyId))
-		{
-			ParentCandidate.bPartial = true;
-		}
-
-		if (ParentCandidate.TotalDurationMs > BestParent.TotalDurationMs ||
-			(ParentCandidate.TotalDurationMs == BestParent.TotalDurationMs && ParentCandidate.TaskIds.Num() > BestParent.TaskIds.Num()))
-		{
-			BestParent = MoveTemp(ParentCandidate);
-		}
-	}
-
-	OutCandidate = BestParent;
-	OutCandidate.TaskIds.Add(TaskId);
-	OutCandidate.TotalDurationMs += Task->RunMs;
-	OutCandidate.bPartial = OutCandidate.bPartial || Task->DependencyTaskIds.Num() > 0 && BestParent.TaskIds.IsEmpty();
-
-	Visiting.Remove(TaskId);
-	Memo.Add(TaskId, OutCandidate);
-	return true;
-}
-}
-
 bool HandleTasksCommands(const FInsightCliRequest& Request, const FTraceContext& Context, FInsightCliResponse& OutResponse)
 {
 	// Handles tasks/top and tasks/critical-path; returns false outside tasks group.
@@ -109,7 +30,8 @@ bool HandleTasksCommands(const FInsightCliRequest& Request, const FTraceContext&
 		FString FailureStage;
 		FString FailureReason;
 		bool bFrameFound = true;
-		if (!BuildTaskTopSamples(Context, bHasFrameIndex ? TOptional<int32>(FrameIndexFilter) : TOptional<int32>(), Tasks, FailureStage, FailureReason, bFrameFound))
+		int32 CycleCount = 0;
+		if (!BuildTaskTopSamples(Context, bHasFrameIndex ? TOptional<int32>(FrameIndexFilter) : TOptional<int32>(), Tasks, FailureStage, FailureReason, bFrameFound, CycleCount))
 		{
 			TMap<FString, FString> ExtraDetails;
 			if (bHasFrameIndex)
@@ -150,6 +72,8 @@ bool HandleTasksCommands(const FInsightCliRequest& Request, const FTraceContext&
 			Meta.Add(TEXT("frame_index"), FString::FromInt(FrameIndexFilter));
 		}
 		Meta.Add(TEXT("data_source"), TEXT("trace"));
+		Meta.Add(TEXT("algorithm"), TEXT("dag_longest_path"));
+		Meta.Add(TEXT("cycle_count"), FString::FromInt(CycleCount));
 		OutResponse = FInsightCliResponse::Ok(MakeEnvelopeWithArray(Data, Meta));
 		return true;
 	}
@@ -186,7 +110,8 @@ bool HandleTasksCommands(const FInsightCliRequest& Request, const FTraceContext&
 		FString FailureStage;
 		FString FailureReason;
 		bool bFrameFound = true;
-		if (!BuildTaskTopSamples(Context, FrameIndex, Tasks, FailureStage, FailureReason, bFrameFound))
+		int32 CycleCount = 0;
+		if (!BuildTaskTopSamples(Context, FrameIndex, Tasks, FailureStage, FailureReason, bFrameFound, CycleCount))
 		{
 			TMap<FString, FString> ExtraDetails;
 			ExtraDetails.Add(TEXT("frame_index"), FString::FromInt(FrameIndex));
@@ -216,43 +141,31 @@ bool HandleTasksCommands(const FInsightCliRequest& Request, const FTraceContext&
 			TaskMap.Add(Task.TaskId, &Task);
 		}
 
-		TArray<FTaskPathCandidate> Candidates;
-		Candidates.Reserve(Tasks.Num());
-		TMap<int32, FTaskPathCandidate> Memo;
-		TSet<int32> Visiting;
-
-		for (const FTaskSample& Task : Tasks)
+		Tasks.Sort([](const FTaskSample& A, const FTaskSample& B)
 		{
-			FTaskPathCandidate Candidate;
-			BuildLongestPathForTask(Task.TaskId, TaskMap, Memo, Visiting, Candidate);
-			Candidates.Add(MoveTemp(Candidate));
-		}
-
-		Candidates.Sort([](const FTaskPathCandidate& A, const FTaskPathCandidate& B)
-		{
-			if (A.TotalDurationMs == B.TotalDurationMs)
+			if (A.CriticalPathMs == B.CriticalPathMs)
 			{
-				return A.TaskIds.Num() > B.TaskIds.Num();
+				return A.CriticalPathTaskChain.Num() > B.CriticalPathTaskChain.Num();
 			}
-			return A.TotalDurationMs > B.TotalDurationMs;
+			return A.CriticalPathMs > B.CriticalPathMs;
 		});
 
-		const int32 TakeCount = FMath::Min(TopK, Candidates.Num());
+		const int32 TakeCount = FMath::Min(TopK, Tasks.Num());
 		TArray<TSharedPtr<FJsonValue>> Data;
 		Data.Reserve(TakeCount);
 		for (int32 Index = 0; Index < TakeCount; ++Index)
 		{
-			const FTaskPathCandidate& Candidate = Candidates[Index];
+			const FTaskSample& Candidate = Tasks[Index];
 			const TSharedRef<FJsonObject> PathObject = MakeShared<FJsonObject>();
 			PathObject->SetNumberField(TEXT("path_rank"), Index + 1);
 			PathObject->SetNumberField(TEXT("frame_index"), FrameIndex);
-			PathObject->SetNumberField(TEXT("total_duration_ms"), Candidate.TotalDurationMs);
-			PathObject->SetNumberField(TEXT("node_count"), Candidate.TaskIds.Num());
-			PathObject->SetBoolField(TEXT("partial"), Candidate.bPartial);
+			PathObject->SetNumberField(TEXT("total_duration_ms"), Candidate.CriticalPathMs);
+			PathObject->SetNumberField(TEXT("node_count"), Candidate.CriticalPathTaskChain.Num());
+			PathObject->SetBoolField(TEXT("partial"), Candidate.DependencyStatus != TEXT("resolved"));
 
 			TArray<TSharedPtr<FJsonValue>> PathNodes;
-			PathNodes.Reserve(Candidate.TaskIds.Num());
-			for (const int32 TaskId : Candidate.TaskIds)
+			PathNodes.Reserve(Candidate.CriticalPathTaskChain.Num());
+			for (const int32 TaskId : Candidate.CriticalPathTaskChain)
 			{
 				const FTaskSample* NodeTask = TaskMap.FindRef(TaskId);
 				const TSharedRef<FJsonObject> Node = MakeShared<FJsonObject>();
@@ -284,6 +197,8 @@ bool HandleTasksCommands(const FInsightCliRequest& Request, const FTraceContext&
 		Meta.Add(TEXT("frame_index"), FString::FromInt(FrameIndex));
 		Meta.Add(TEXT("top"), FString::FromInt(TopK));
 		Meta.Add(TEXT("data_source"), TEXT("trace"));
+		Meta.Add(TEXT("algorithm"), TEXT("dag_longest_path"));
+		Meta.Add(TEXT("cycle_count"), FString::FromInt(CycleCount));
 		OutResponse = FInsightCliResponse::Ok(MakeEnvelopeWithArray(Data, Meta));
 		return true;
 	}
