@@ -114,7 +114,14 @@ bool ResolveCpuThreadFilterToTraceId(const FTraceContext& Context, const FString
 	return true;
 }
 
-bool BuildCpuTopSamples(const FTraceContext& Context, const TOptional<uint32>& CpuThreadId, TArray<FCpuScopeSample>& OutSamples, FString& OutFailureStage, FString& OutFailureReason)
+bool BuildCpuTopSamples(
+	const FTraceContext& Context,
+	const TOptional<uint32>& CpuThreadId,
+	TArray<FCpuScopeSample>& OutSamples,
+	FString& OutFailureStage,
+	FString& OutFailureReason,
+	TOptional<double> IntervalStartSec,
+	TOptional<double> IntervalEndSec)
 {
 	OutSamples.Reset();
 	OutFailureStage.Reset();
@@ -138,8 +145,10 @@ bool BuildCpuTopSamples(const FTraceContext& Context, const TOptional<uint32>& C
 		}
 
 		TraceServices::FCreateAggreationParams Params;
-		Params.IntervalStart = 0.0;
-		Params.IntervalEnd = Session->GetDurationSeconds();
+		Params.IntervalStart = IntervalStartSec.IsSet() ? FMath::Max(0.0, IntervalStartSec.GetValue()) : 0.0;
+		const double DefaultEndSec = Session->GetDurationSeconds();
+		Params.IntervalEnd = IntervalEndSec.IsSet() ? FMath::Min(DefaultEndSec, FMath::Max(Params.IntervalStart, IntervalEndSec.GetValue())) : DefaultEndSec;
+		Params.IntervalEnd = FMath::Max(Params.IntervalStart + KINDA_SMALL_NUMBER, Params.IntervalEnd);
 		Params.IncludeGpu = false;
 		Params.FrameType = ETraceFrameType::TraceFrameType_Count;
 		if (CpuThreadId.IsSet())

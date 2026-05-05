@@ -350,6 +350,40 @@ function Invoke-NormalTraceSmoke {
 
     $postDetailCases = @(
         (New-SmokeCase -Message "[$([IO.Path]::GetFileName($TracePath))] Verify cpu top returns scope list..." -Context 'cpu top' -Args @($TracePath, 'cpu', 'top', '--thread', 'GameThread', '--limit', '3') -MustContain @('"data"', '"scope_name"')),
+        (New-SmokeCase -Message "[$([IO.Path]::GetFileName($TracePath))] Verify cpu stat-groups and stat-group filter..." -Context 'cpu stat-groups' -Args @($TracePath, 'cpu', 'stat-groups') -MustContain @('"data"', '"scope_count"', '"total_self_ms"') -Validate {
+            param($result)
+            $groupsJson = Parse-JsonOutput -Text $result.Text -Context 'cpu stat-groups'
+            if ($null -eq $groupsJson.data) {
+                throw 'Expected cpu stat-groups response to include data array'
+            }
+            if ($groupsJson.data.Count -lt 3) {
+                throw 'Expected cpu stat-groups to return at least 3 groups'
+            }
+
+            $groupName = [string]$groupsJson.data[0].name
+            if ([string]::IsNullOrWhiteSpace($groupName)) {
+                throw 'Expected cpu stat-groups rows to include non-empty name'
+            }
+
+            $fullTopResult = Invoke-InsightCli -Args @($TracePath, 'cpu', 'top', '--limit', '20')
+            if ($fullTopResult.ExitCode -ne 0) {
+                throw 'Expected zero exit code for cpu top baseline in stat-group smoke'
+            }
+            $fullTopJson = Parse-JsonOutput -Text $fullTopResult.Text -Context 'cpu top baseline for stat-group'
+
+            $filteredTopResult = Invoke-InsightCli -Args @($TracePath, 'cpu', 'top', '--limit', '20', '--stat-group', $groupName, '--frame-index', '1')
+            if ($filteredTopResult.ExitCode -ne 0) {
+                throw 'Expected zero exit code for cpu top stat-group filter'
+            }
+            $filteredTopJson = Parse-JsonOutput -Text $filteredTopResult.Text -Context 'cpu top stat-group filter'
+
+            if ($filteredTopJson.meta.stat_group -ne $groupName.ToLower()) {
+                throw 'Expected cpu top stat-group metadata echo in lowercase'
+            }
+            if ($filteredTopJson.data.Count -gt $fullTopJson.data.Count) {
+                throw 'Expected cpu top --stat-group row count <= baseline cpu top row count'
+            }
+        }),
         (New-SmokeCase -Message "[$([IO.Path]::GetFileName($TracePath))] Verify cpu top supports --fields projection..." -Context 'cpu top fields projection' -Args @($TracePath, 'cpu', 'top', '--thread', 'GameThread', '--limit', '3', '--fields', 'scope_name,self_ms,missing_field') -MustContain @('"scope_name"', '"self_ms"', '"fields_missing"') -Validate {
             param($result)
             $json = Parse-JsonOutput -Text $result.Text -Context 'cpu top fields projection'

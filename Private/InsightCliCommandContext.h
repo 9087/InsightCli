@@ -250,7 +250,14 @@ TSharedRef<FJsonObject> MakeFrameObject(const FFrameSample& Sample);
 
 // JSON/data builders: cpu
 bool ResolveCpuThreadFilterToTraceId(const FTraceContext& Context, const FString& ThreadFilter, uint32& OutThreadId, FString& OutNormalizedThread, FString& OutFailureStage, FString& OutFailureReason);
-bool BuildCpuTopSamples(const FTraceContext& Context, const TOptional<uint32>& CpuThreadId, TArray<FCpuScopeSample>& OutSamples, FString& OutFailureStage, FString& OutFailureReason);
+bool BuildCpuTopSamples(
+	const FTraceContext& Context,
+	const TOptional<uint32>& CpuThreadId,
+	TArray<FCpuScopeSample>& OutSamples,
+	FString& OutFailureStage,
+	FString& OutFailureReason,
+	TOptional<double> IntervalStartSec = {},
+	TOptional<double> IntervalEndSec = {});
 bool BuildCpuStackObject(
 	const FTraceContext& Context,
 	int32 FrameIndex,
