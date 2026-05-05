@@ -151,7 +151,7 @@ bool HandleCpuCommands(const FInsightCliRequest& Request, const FTraceContext& C
 	if (Request.Group == TEXT("cpu") && Request.Action == TEXT("top"))
 	{
 		FInsightCliResponse UnknownOptionError;
-		if (!ValidateNoUnknownOptionsWithGlobals(Request.Args, { TEXT("limit"), TEXT("thread"), TEXT("stat-group"), TEXT("frame-index") }, UnknownOptionError))
+		if (!ValidateNoUnknownOptionsWithGlobals(Request.Args, { TEXT("limit"), TEXT("thread"), TEXT("stat-group"), TEXT("frame-index"), TEXT("rank-by") }, UnknownOptionError))
 		{
 			OutResponse = UnknownOptionError;
 			return true;
@@ -209,6 +209,17 @@ bool HandleCpuCommands(const FInsightCliRequest& Request, const FTraceContext& C
 			StatGroupFilter = StatGroupFilter.ToLower();
 		}
 
+		FString RankBy = TEXT("total");
+		if (TryGetStringOption(Request.Args, TEXT("--rank-by"), RankBy))
+		{
+			RankBy = RankBy.ToLower();
+			if (RankBy != TEXT("total") && RankBy != TEXT("self"))
+			{
+				OutResponse = MakeOptionError(TEXT("rank-by must be one of: total, self."));
+				return true;
+			}
+		}
+
 		int32 FrameIndexFilter = -1;
 		const bool bHasFrameIndexFilter = TryGetIntOption(Request.Args, TEXT("--frame-index"), FrameIndexFilter);
 		if (bHasFrameIndexFilter && FrameIndexFilter < 0)
@@ -258,6 +269,18 @@ bool HandleCpuCommands(const FInsightCliRequest& Request, const FTraceContext& C
 			});
 		}
 
+		if (RankBy == TEXT("self"))
+		{
+			Samples.Sort([](const FCpuScopeSample& A, const FCpuScopeSample& B)
+			{
+				if (A.SelfMs == B.SelfMs)
+				{
+					return A.ScopeName < B.ScopeName;
+				}
+				return A.SelfMs > B.SelfMs;
+			});
+		}
+
 		const int32 TakeCount = FMath::Min(Limit, Samples.Num());
 		TArray<TSharedPtr<FJsonValue>> Data;
 		Data.Reserve(TakeCount);
@@ -285,6 +308,7 @@ bool HandleCpuCommands(const FInsightCliRequest& Request, const FTraceContext& C
 		{
 			Meta.Add(TEXT("frame_index"), FString::FromInt(FrameIndexFilter));
 		}
+		Meta.Add(TEXT("sort_by"), RankBy == TEXT("self") ? TEXT("self_ms_desc") : TEXT("total_ms_desc"));
 		Meta.Add(TEXT("data_source"), TEXT("trace"));
 		OutResponse = FInsightCliResponse::Ok(MakeEnvelopeWithArray(Data, Meta));
 		return true;

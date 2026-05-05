@@ -79,6 +79,7 @@ struct FGpuScopeSample
 	FString ScopeName;
 	int32 CallCount = 0;
 	double TotalMs = 0.0;
+	double SelfMs = 0.0;
 	double AvgMs = 0.0;
 	double MaxMs = 0.0;
 };

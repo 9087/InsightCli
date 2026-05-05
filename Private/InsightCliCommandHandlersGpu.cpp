@@ -67,7 +67,7 @@ bool HandleGpuCommands(const FInsightCliRequest& Request, const FTraceContext& C
 	if (Request.Group == TEXT("gpu") && Request.Action == TEXT("top"))
 	{
 		FInsightCliResponse UnknownOptionError;
-		if (!ValidateNoUnknownOptionsWithGlobals(Request.Args, { TEXT("limit") }, UnknownOptionError))
+		if (!ValidateNoUnknownOptionsWithGlobals(Request.Args, { TEXT("limit"), TEXT("rank-by") }, UnknownOptionError))
 		{
 			OutResponse = UnknownOptionError;
 			return true;
@@ -79,6 +79,17 @@ bool HandleGpuCommands(const FInsightCliRequest& Request, const FTraceContext& C
 		{
 			OutResponse = LimitError;
 			return true;
+		}
+
+		FString RankBy = TEXT("total");
+		if (TryGetStringOption(Request.Args, TEXT("--rank-by"), RankBy))
+		{
+			RankBy = RankBy.ToLower();
+			if (RankBy != TEXT("total") && RankBy != TEXT("self"))
+			{
+				OutResponse = MakeOptionError(TEXT("rank-by must be one of: total, self."));
+				return true;
+			}
 		}
 
 		TArray<FGpuScopeSample> Samples;
@@ -97,6 +108,18 @@ bool HandleGpuCommands(const FInsightCliRequest& Request, const FTraceContext& C
 			return true;
 		}
 
+		if (RankBy == TEXT("self"))
+		{
+			Samples.Sort([](const FGpuScopeSample& A, const FGpuScopeSample& B)
+			{
+				if (A.SelfMs == B.SelfMs)
+				{
+					return A.ScopeName < B.ScopeName;
+				}
+				return A.SelfMs > B.SelfMs;
+			});
+		}
+
 		const int32 TakeCount = FMath::Min(Limit, Samples.Num());
 		TArray<TSharedPtr<FJsonValue>> Data;
 		Data.Reserve(TakeCount);
@@ -107,6 +130,7 @@ bool HandleGpuCommands(const FInsightCliRequest& Request, const FTraceContext& C
 
 		TMap<FString, FString> Meta;
 		Meta.Add(TEXT("limit"), FString::FromInt(Limit));
+		Meta.Add(TEXT("sort_by"), RankBy == TEXT("self") ? TEXT("self_ms_desc") : TEXT("total_ms_desc"));
 		Meta.Add(TEXT("data_source"), TEXT("trace"));
 		OutResponse = FInsightCliResponse::Ok(MakeEnvelopeWithArray(Data, Meta));
 		return true;
@@ -115,10 +139,21 @@ bool HandleGpuCommands(const FInsightCliRequest& Request, const FTraceContext& C
 	if (Request.Group == TEXT("gpu") && Request.Action == TEXT("passes"))
 	{
 		FInsightCliResponse UnknownOptionError;
-		if (!ValidateNoUnknownOptionsWithGlobals(Request.Args, { TEXT("frame-index"), TEXT("time-start"), TEXT("time-end") }, UnknownOptionError))
+		if (!ValidateNoUnknownOptionsWithGlobals(Request.Args, { TEXT("frame-index"), TEXT("time-start"), TEXT("time-end"), TEXT("rank-by") }, UnknownOptionError))
 		{
 			OutResponse = UnknownOptionError;
 			return true;
+		}
+
+		FString RankBy = TEXT("total");
+		if (TryGetStringOption(Request.Args, TEXT("--rank-by"), RankBy))
+		{
+			RankBy = RankBy.ToLower();
+			if (RankBy != TEXT("total") && RankBy != TEXT("self"))
+			{
+				OutResponse = MakeOptionError(TEXT("rank-by must be one of: total, self."));
+				return true;
+			}
 		}
 
 		const bool bHasTimeStart = HasOption(Request.Args, TEXT("--time-start"));
@@ -206,6 +241,18 @@ bool HandleGpuCommands(const FInsightCliRequest& Request, const FTraceContext& C
 			return true;
 		}
 
+		if (RankBy == TEXT("self"))
+		{
+			Samples.Sort([](const FGpuScopeSample& A, const FGpuScopeSample& B)
+			{
+				if (A.SelfMs == B.SelfMs)
+				{
+					return A.ScopeName < B.ScopeName;
+				}
+				return A.SelfMs > B.SelfMs;
+			});
+		}
+
 		TArray<TSharedPtr<FJsonValue>> Data;
 		Data.Reserve(Samples.Num());
 		for (const FGpuScopeSample& Sample : Samples)
@@ -213,6 +260,7 @@ bool HandleGpuCommands(const FInsightCliRequest& Request, const FTraceContext& C
 			Data.Add(MakeShared<FJsonValueObject>(MakeGpuPassesObject(Sample)));
 		}
 
+		Meta.Add(TEXT("sort_by"), RankBy == TEXT("self") ? TEXT("self_ms_desc") : TEXT("total_ms_desc"));
 		OutResponse = FInsightCliResponse::Ok(MakeEnvelopeWithArray(Data, Meta));
 		return true;
 	}

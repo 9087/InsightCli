@@ -82,6 +82,7 @@ bool BuildGpuTopSamples(
 			Sample.ScopeName = Row->Timer->Name != nullptr ? Row->Timer->Name : TEXT("<unknown>");
 			Sample.CallCount = (Row->InstanceCount > static_cast<uint64>(MAX_int32)) ? MAX_int32 : static_cast<int32>(Row->InstanceCount);
 			Sample.TotalMs = Row->TotalInclusiveTime * 1000.0;
+			Sample.SelfMs = Row->TotalExclusiveTime * 1000.0;
 			Sample.AvgMs = Row->AverageInclusiveTime * 1000.0;
 			Sample.MaxMs = Row->MaxInclusiveTime * 1000.0;
 			OutSamples.Add(Sample);
@@ -114,6 +115,7 @@ TSharedRef<FJsonObject> MakeGpuTopObject(const FGpuScopeSample& Sample)
 	Item->SetStringField(TEXT("gpu_scope_name"), Sample.ScopeName);
 	Item->SetNumberField(TEXT("call_count"), Sample.CallCount);
 	Item->SetNumberField(TEXT("total_ms"), Sample.TotalMs);
+	Item->SetNumberField(TEXT("self_ms"), Sample.SelfMs);
 	Item->SetNumberField(TEXT("avg_ms"), Sample.AvgMs);
 	Item->SetNumberField(TEXT("max_ms"), Sample.MaxMs);
 	return Item;
@@ -124,6 +126,7 @@ TSharedRef<FJsonObject> MakeGpuPassesObject(const FGpuScopeSample& Sample)
 	const TSharedRef<FJsonObject> Item = MakeShared<FJsonObject>();
 	Item->SetStringField(TEXT("pass"), Sample.ScopeName);
 	Item->SetNumberField(TEXT("gpu_ms"), Sample.TotalMs);
+	Item->SetNumberField(TEXT("self_ms"), Sample.SelfMs);
 	Item->SetNumberField(TEXT("draw_call_count"), Sample.CallCount);
 	return Item;
 }
@@ -135,6 +138,7 @@ TSharedRef<FJsonObject> MakeGpuPassDetailObject(const FFrameSample& FrameSample,
 	Item->SetStringField(TEXT("pass_name"), Sample.ScopeName);
 	Item->SetNumberField(TEXT("draw_calls"), Sample.CallCount);
 	Item->SetNumberField(TEXT("duration_ms"), Sample.TotalMs);
+	Item->SetNumberField(TEXT("self_ms"), Sample.SelfMs);
 	return Item;
 }
 }
