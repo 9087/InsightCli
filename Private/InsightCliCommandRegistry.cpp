@@ -16,69 +16,71 @@ struct FCommandCatalogEntry
 	const TCHAR* Group;
 	const TCHAR* Action;
 	FGroupHandlerFn Handler;
+	std::initializer_list<const TCHAR*> RequiredOptions;
+	std::initializer_list<const TCHAR*> OptionalOptions;
 };
 
-constexpr FCommandCatalogEntry CommandCatalog[] =
+const FCommandCatalogEntry CommandCatalog[] =
 {
-	{ TEXT("info"), TEXT("summary"), &HandleInfoAndFramesCommands },
-	{ TEXT("info"), TEXT("channels"), &HandleInfoAndFramesCommands },
-	{ TEXT("frames"), TEXT("summary"), &HandleInfoAndFramesCommands },
-	{ TEXT("frames"), TEXT("slowest"), &HandleInfoAndFramesCommands },
-	{ TEXT("frames"), TEXT("detail"), &HandleInfoAndFramesCommands },
-	{ TEXT("cpu"), TEXT("top"), &HandlePerformanceCommands },
-	{ TEXT("cpu"), TEXT("stack"), &HandlePerformanceCommands },
-	{ TEXT("cpu"), TEXT("hot-functions"), &HandlePerformanceCommands },
-	{ TEXT("gpu"), TEXT("top"), &HandlePerformanceCommands },
-	{ TEXT("gpu"), TEXT("passes"), &HandlePerformanceCommands },
-	{ TEXT("gpu"), TEXT("pass-detail"), &HandlePerformanceCommands },
-	{ TEXT("rhi"), TEXT("summary"), &HandlePerformanceCommands },
-	{ TEXT("rhi"), TEXT("drawcalls"), &HandlePerformanceCommands },
-	{ TEXT("rhi"), TEXT("top-materials"), &HandlePerformanceCommands },
-	{ TEXT("rhi"), TEXT("top-meshes"), &HandlePerformanceCommands },
-	{ TEXT("anim"), TEXT("top-actors"), &HandlePerformanceCommands },
-	{ TEXT("anim"), TEXT("graph"), &HandlePerformanceCommands },
-	{ TEXT("anim"), TEXT("skinning"), &HandlePerformanceCommands },
-	{ TEXT("niagara"), TEXT("top-systems"), &HandlePerformanceCommands },
-	{ TEXT("niagara"), TEXT("emitter-cost"), &HandlePerformanceCommands },
-	{ TEXT("physics"), TEXT("summary"), &HandlePerformanceCommands },
-	{ TEXT("physics"), TEXT("solver-stages"), &HandlePerformanceCommands },
-	{ TEXT("physics"), TEXT("top-bodies"), &HandlePerformanceCommands },
-	{ TEXT("slate"), TEXT("top-widgets"), &HandlePerformanceCommands },
-	{ TEXT("slate"), TEXT("paint-cost"), &HandlePerformanceCommands },
-	{ TEXT("slate"), TEXT("invalidation-rate"), &HandlePerformanceCommands },
-	{ TEXT("threads"), TEXT("waits"), &HandlePerformanceCommands },
-	{ TEXT("threads"), TEXT("wait-chain"), &HandlePerformanceCommands },
-	{ TEXT("tasks"), TEXT("top"), &HandlePerformanceCommands },
-	{ TEXT("tasks"), TEXT("critical-path"), &HandlePerformanceCommands },
-	{ TEXT("net"), TEXT("summary"), &HandleDataCommands },
-	{ TEXT("net"), TEXT("top-actors"), &HandleDataCommands },
-	{ TEXT("net"), TEXT("top-rpcs"), &HandleDataCommands },
-	{ TEXT("net"), TEXT("bandwidth-series"), &HandleDataCommands },
-	{ TEXT("shaders"), TEXT("compile-events"), &HandleDataCommands },
-	{ TEXT("shaders"), TEXT("pso-cache-misses"), &HandleDataCommands },
-	{ TEXT("io"), TEXT("summary"), &HandleDataCommands },
-	{ TEXT("io"), TEXT("slowest-reads"), &HandleDataCommands },
-	{ TEXT("io"), TEXT("top-files"), &HandleDataCommands },
-	{ TEXT("symbols"), TEXT("resolve"), &HandleDataCommands },
-	{ TEXT("counters"), TEXT("list"), &HandleDataCommands },
-	{ TEXT("counters"), TEXT("series"), &HandleDataCommands },
-	{ TEXT("counters"), TEXT("stats"), &HandleDataCommands },
-	{ TEXT("memory"), TEXT("summary"), &HandleDataCommands },
-	{ TEXT("memory"), TEXT("peak"), &HandleDataCommands },
-	{ TEXT("memory"), TEXT("series"), &HandleDataCommands },
-	{ TEXT("memory"), TEXT("tags"), &HandleDataCommands },
-	{ TEXT("memory"), TEXT("diff"), &HandleDataCommands },
-	{ TEXT("memory"), TEXT("alloc-top"), &HandleDataCommands },
-	{ TEXT("memory"), TEXT("leak-suspect"), &HandleDataCommands },
-	{ TEXT("marks"), TEXT("search"), &HandleDataCommands },
-	{ TEXT("marks"), TEXT("around"), &HandleDataCommands },
-	{ TEXT("loadtime"), TEXT("summary"), &HandleDataCommands },
-	{ TEXT("loadtime"), TEXT("packages"), &HandleDataCommands },
-	{ TEXT("loadtime"), TEXT("slowest"), &HandleDataCommands },
-	{ TEXT("loadtime"), TEXT("timeline"), &HandleDataCommands },
-	{ TEXT("gc"), TEXT("summary"), &HandleDataCommands },
-	{ TEXT("gc"), TEXT("events"), &HandleDataCommands },
-	{ TEXT("gc"), TEXT("longest"), &HandleDataCommands },
+	{ TEXT("info"), TEXT("summary"), &HandleInfoAndFramesCommands, {}, {} },
+	{ TEXT("info"), TEXT("channels"), &HandleInfoAndFramesCommands, {}, {} },
+	{ TEXT("frames"), TEXT("summary"), &HandleInfoAndFramesCommands, {}, { TEXT("time-start"), TEXT("time-end"), TEXT("frame-range") } },
+	{ TEXT("frames"), TEXT("slowest"), &HandleInfoAndFramesCommands, {}, { TEXT("limit"), TEXT("time-start"), TEXT("time-end"), TEXT("frame-range") } },
+	{ TEXT("frames"), TEXT("detail"), &HandleInfoAndFramesCommands, { TEXT("frame-index") }, { TEXT("breakdown") } },
+	{ TEXT("cpu"), TEXT("top"), &HandlePerformanceCommands, {}, { TEXT("thread"), TEXT("limit"), TEXT("time-start"), TEXT("time-end"), TEXT("frame-range") } },
+	{ TEXT("cpu"), TEXT("stack"), &HandlePerformanceCommands, { TEXT("frame-index") }, { TEXT("thread"), TEXT("limit"), TEXT("view") } },
+	{ TEXT("cpu"), TEXT("hot-functions"), &HandlePerformanceCommands, {}, { TEXT("thread"), TEXT("limit") } },
+	{ TEXT("gpu"), TEXT("top"), &HandlePerformanceCommands, {}, { TEXT("limit"), TEXT("time-start"), TEXT("time-end"), TEXT("frame-range") } },
+	{ TEXT("gpu"), TEXT("passes"), &HandlePerformanceCommands, { TEXT("frame-index") }, {} },
+	{ TEXT("gpu"), TEXT("pass-detail"), &HandlePerformanceCommands, { TEXT("frame-index"), TEXT("pass") }, {} },
+	{ TEXT("rhi"), TEXT("summary"), &HandlePerformanceCommands, { TEXT("frame-index") }, {} },
+	{ TEXT("rhi"), TEXT("drawcalls"), &HandlePerformanceCommands, {}, { TEXT("limit"), TEXT("frame-index") } },
+	{ TEXT("rhi"), TEXT("top-materials"), &HandlePerformanceCommands, {}, { TEXT("limit"), TEXT("frame-index") } },
+	{ TEXT("rhi"), TEXT("top-meshes"), &HandlePerformanceCommands, {}, { TEXT("limit"), TEXT("frame-index") } },
+	{ TEXT("anim"), TEXT("top-actors"), &HandlePerformanceCommands, {}, { TEXT("limit") } },
+	{ TEXT("anim"), TEXT("graph"), &HandlePerformanceCommands, { TEXT("actor") }, {} },
+	{ TEXT("anim"), TEXT("skinning"), &HandlePerformanceCommands, {}, { TEXT("limit") } },
+	{ TEXT("niagara"), TEXT("top-systems"), &HandlePerformanceCommands, {}, { TEXT("limit") } },
+	{ TEXT("niagara"), TEXT("emitter-cost"), &HandlePerformanceCommands, {}, { TEXT("system") } },
+	{ TEXT("physics"), TEXT("summary"), &HandlePerformanceCommands, {}, { TEXT("frame-index") } },
+	{ TEXT("physics"), TEXT("solver-stages"), &HandlePerformanceCommands, {}, {} },
+	{ TEXT("physics"), TEXT("top-bodies"), &HandlePerformanceCommands, {}, { TEXT("limit") } },
+	{ TEXT("slate"), TEXT("top-widgets"), &HandlePerformanceCommands, {}, { TEXT("by"), TEXT("limit") } },
+	{ TEXT("slate"), TEXT("paint-cost"), &HandlePerformanceCommands, {}, { TEXT("frame-index") } },
+	{ TEXT("slate"), TEXT("invalidation-rate"), &HandlePerformanceCommands, {}, { TEXT("time-start"), TEXT("time-end"), TEXT("frame-range") } },
+	{ TEXT("threads"), TEXT("waits"), &HandlePerformanceCommands, {}, { TEXT("frame-index"), TEXT("limit") } },
+	{ TEXT("threads"), TEXT("wait-chain"), &HandlePerformanceCommands, {}, { TEXT("thread"), TEXT("depth"), TEXT("time-start"), TEXT("time-end"), TEXT("frame-range") } },
+	{ TEXT("tasks"), TEXT("top"), &HandlePerformanceCommands, {}, { TEXT("frame-index"), TEXT("limit") } },
+	{ TEXT("tasks"), TEXT("critical-path"), &HandlePerformanceCommands, {}, { TEXT("frame-index"), TEXT("top") } },
+	{ TEXT("net"), TEXT("summary"), &HandleDataCommands, {}, {} },
+	{ TEXT("net"), TEXT("top-actors"), &HandleDataCommands, {}, { TEXT("limit") } },
+	{ TEXT("net"), TEXT("top-rpcs"), &HandleDataCommands, {}, { TEXT("limit") } },
+	{ TEXT("net"), TEXT("bandwidth-series"), &HandleDataCommands, {}, { TEXT("time-start"), TEXT("time-end"), TEXT("frame-range") } },
+	{ TEXT("shaders"), TEXT("compile-events"), &HandleDataCommands, {}, { TEXT("limit") } },
+	{ TEXT("shaders"), TEXT("pso-cache-misses"), &HandleDataCommands, {}, {} },
+	{ TEXT("io"), TEXT("summary"), &HandleDataCommands, {}, {} },
+	{ TEXT("io"), TEXT("slowest-reads"), &HandleDataCommands, {}, { TEXT("limit") } },
+	{ TEXT("io"), TEXT("top-files"), &HandleDataCommands, {}, { TEXT("limit") } },
+	{ TEXT("symbols"), TEXT("resolve"), &HandleDataCommands, { TEXT("name") }, {} },
+	{ TEXT("counters"), TEXT("list"), &HandleDataCommands, {}, {} },
+	{ TEXT("counters"), TEXT("series"), &HandleDataCommands, { TEXT("name") }, { TEXT("time-start"), TEXT("time-end"), TEXT("frame-range") } },
+	{ TEXT("counters"), TEXT("stats"), &HandleDataCommands, { TEXT("name") }, { TEXT("time-start"), TEXT("time-end"), TEXT("frame-range") } },
+	{ TEXT("memory"), TEXT("summary"), &HandleDataCommands, {}, { TEXT("time-start"), TEXT("time-end"), TEXT("frame-range") } },
+	{ TEXT("memory"), TEXT("peak"), &HandleDataCommands, {}, { TEXT("time-start"), TEXT("time-end"), TEXT("frame-range") } },
+	{ TEXT("memory"), TEXT("series"), &HandleDataCommands, {}, { TEXT("limit"), TEXT("time-start"), TEXT("time-end"), TEXT("frame-range") } },
+	{ TEXT("memory"), TEXT("tags"), &HandleDataCommands, {}, { TEXT("limit"), TEXT("at"), TEXT("time-start"), TEXT("time-end"), TEXT("frame-range") } },
+	{ TEXT("memory"), TEXT("diff"), &HandleDataCommands, { TEXT("t1"), TEXT("t2") }, { TEXT("limit"), TEXT("by") } },
+	{ TEXT("memory"), TEXT("alloc-top"), &HandleDataCommands, {}, { TEXT("limit"), TEXT("by") } },
+	{ TEXT("memory"), TEXT("leak-suspect"), &HandleDataCommands, {}, { TEXT("limit") } },
+	{ TEXT("marks"), TEXT("search"), &HandleDataCommands, { TEXT("keyword") }, { TEXT("limit"), TEXT("category"), TEXT("channel"), TEXT("thread-id"), TEXT("case-sensitive"), TEXT("exact"), TEXT("time-start"), TEXT("time-end"), TEXT("frame-range") } },
+	{ TEXT("marks"), TEXT("around"), &HandleDataCommands, { TEXT("at") }, { TEXT("window-ms"), TEXT("limit") } },
+	{ TEXT("loadtime"), TEXT("summary"), &HandleDataCommands, {}, {} },
+	{ TEXT("loadtime"), TEXT("packages"), &HandleDataCommands, {}, { TEXT("limit"), TEXT("sort-by") } },
+	{ TEXT("loadtime"), TEXT("slowest"), &HandleDataCommands, {}, { TEXT("limit") } },
+	{ TEXT("loadtime"), TEXT("timeline"), &HandleDataCommands, {}, { TEXT("time-start"), TEXT("time-end"), TEXT("frame-range"), TEXT("limit") } },
+	{ TEXT("gc"), TEXT("summary"), &HandleDataCommands, {}, {} },
+	{ TEXT("gc"), TEXT("events"), &HandleDataCommands, {}, { TEXT("time-start"), TEXT("time-end"), TEXT("frame-range"), TEXT("limit") } },
+	{ TEXT("gc"), TEXT("longest"), &HandleDataCommands, {}, { TEXT("limit") } },
 };
 
 const FCommandCatalogEntry* FindCatalogEntry(const FInsightCliRequest& Request)
@@ -137,5 +139,25 @@ FInsightCliResponse ExecuteCommand(const FInsightCliRequest& Request)
 FInsightCliResponse ExecuteCommandWithSharedContext(const FInsightCliRequest& Request, const Internal::FTraceContext& SharedContext)
 {
 	return ExecuteResolvedCommand(Request, SharedContext);
+}
+
+void EnumerateCommandCatalog(TFunctionRef<void(const FInsightCliCommandCatalogEntry&)> Visitor)
+{
+	for (const FCommandCatalogEntry& Entry : CommandCatalog)
+	{
+		FInsightCliCommandCatalogEntry PublicEntry;
+		PublicEntry.Group = Entry.Group;
+		PublicEntry.Action = Entry.Action;
+		for (const TCHAR* Option : Entry.RequiredOptions)
+		{
+			PublicEntry.RequiredOptions.Add(Option);
+		}
+		for (const TCHAR* Option : Entry.OptionalOptions)
+		{
+			PublicEntry.OptionalOptions.Add(Option);
+		}
+
+		Visitor(PublicEntry);
+	}
 }
 }

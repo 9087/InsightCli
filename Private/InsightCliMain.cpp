@@ -22,6 +22,66 @@ namespace
 constexpr TCHAR InvalidFormatMessage[] = TEXT("Invalid command format. Expected: insight-cli <trace_path> <group> <action> [options]");
 constexpr TCHAR InvalidBatchFormatMessage[] = TEXT("Invalid batch format. Expected: insight-cli <trace_path> --batch <commands.json|- >");
 
+bool IsHelpToken(const TCHAR* Token)
+{
+	return FCString::Stricmp(Token, TEXT("help")) == 0
+		|| FCString::Stricmp(Token, TEXT("--help")) == 0
+		|| FCString::Stricmp(Token, TEXT("-h")) == 0;
+}
+
+UE::InsightCli::FInsightCliResponse MakeTopLevelHelpResponse()
+{
+	TArray<TSharedPtr<FJsonValue>> Commands;
+	int32 CommandCount = 0;
+	UE::InsightCli::EnumerateCommandCatalog([&Commands, &CommandCount](const UE::InsightCli::FInsightCliCommandCatalogEntry& Entry)
+	{
+		const TSharedRef<FJsonObject> Item = MakeShared<FJsonObject>();
+		Item->SetStringField(TEXT("group"), Entry.Group);
+		Item->SetStringField(TEXT("action"), Entry.Action);
+
+		TArray<TSharedPtr<FJsonValue>> RequiredOptions;
+		RequiredOptions.Reserve(Entry.RequiredOptions.Num());
+		for (const FString& Option : Entry.RequiredOptions)
+		{
+			RequiredOptions.Add(MakeShared<FJsonValueString>(Option));
+		}
+
+		TArray<TSharedPtr<FJsonValue>> OptionalOptions;
+		OptionalOptions.Reserve(Entry.OptionalOptions.Num());
+		for (const FString& Option : Entry.OptionalOptions)
+		{
+			OptionalOptions.Add(MakeShared<FJsonValueString>(Option));
+		}
+
+		Item->SetArrayField(TEXT("required_options"), RequiredOptions);
+		Item->SetArrayField(TEXT("optional_options"), OptionalOptions);
+		Commands.Add(MakeShared<FJsonValueObject>(Item));
+		++CommandCount;
+	});
+
+	TMap<FString, FString> Meta;
+	Meta.Add(TEXT("command_count"), FString::FromInt(CommandCount));
+	Meta.Add(TEXT("source"), TEXT("command_catalog"));
+
+	return UE::InsightCli::FInsightCliResponse::Ok(UE::InsightCli::Internal::MakeEnvelopeWithArray(Commands, Meta));
+}
+
+bool TryHandleTopLevelCommand(int32 ArgC, TCHAR* ArgV[], UE::InsightCli::FInsightCliResponse& OutResponse)
+{
+	if (ArgC != 2)
+	{
+		return false;
+	}
+
+	if (IsHelpToken(ArgV[1]))
+	{
+		OutResponse = MakeTopLevelHelpResponse();
+		return true;
+	}
+
+	return false;
+}
+
 void WriteUtf8(FILE* Stream, const FString& Text)
 {
 	FTCHARToUTF8 Converted(*Text);
@@ -303,6 +363,12 @@ UE::InsightCli::FInsightCliResponse RunBatchProgram(int32 ArgC, TCHAR* ArgV[])
 
 UE::InsightCli::FInsightCliResponse RunProgram(int32 ArgC, TCHAR* ArgV[])
 {
+	UE::InsightCli::FInsightCliResponse TopLevelResponse;
+	if (TryHandleTopLevelCommand(ArgC, ArgV, TopLevelResponse))
+	{
+		return TopLevelResponse;
+	}
+
 	if (ArgC >= 3 && FCString::Stricmp(ArgV[2], TEXT("--batch")) == 0)
 	{
 		return RunBatchProgram(ArgC, ArgV);

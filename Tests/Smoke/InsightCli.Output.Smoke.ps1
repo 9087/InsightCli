@@ -1471,6 +1471,49 @@ function Invoke-NormalTraceSmoke {
     Invoke-SmokeCaseList -Cases $orderedSilentCases
 }
 
+function Invoke-TopLevelSmoke {
+    $topLevelCases = @(
+        (New-SmokeCase -Message "Verify top-level help command returns command catalog..." -Context 'top-level help' -Args @('help') -MustContain @('"data"', '"group"', '"action"', '"required_options"', '"optional_options"') -Validate {
+            param($result)
+            $json = Parse-JsonOutput -Text $result.Text -Context 'top-level help'
+            if ($null -eq $json.data -or $json.data.Count -lt 1) {
+                throw 'Expected top-level help to return non-empty command catalog array'
+            }
+            $first = $json.data[0]
+            if ([string]::IsNullOrWhiteSpace([string]$first.group) -or [string]::IsNullOrWhiteSpace([string]$first.action)) {
+                throw 'Expected top-level help rows to include group and action'
+            }
+            if ($null -eq $first.required_options -or $null -eq $first.optional_options) {
+                throw 'Expected top-level help rows to include required_options and optional_options arrays'
+            }
+
+            $hasInfoSummary = $false
+            foreach ($row in $json.data) {
+                if ([string]$row.group -eq 'info' -and [string]$row.action -eq 'summary') {
+                    $hasInfoSummary = $true
+                    break
+                }
+            }
+
+            if (-not $hasInfoSummary) {
+                throw 'Expected top-level help catalog to include info summary command'
+            }
+        }),
+        (New-SmokeCase -Message "Verify top-level --help alias works..." -Context 'top-level --help' -Args @('--help') -MustContain @('"data"', '"group"', '"action"') -Validate {
+            param($result)
+            $json = Parse-JsonOutput -Text $result.Text -Context 'top-level --help'
+            if ($null -eq $json.data -or $json.data.Count -lt 1) {
+                throw 'Expected top-level --help to return non-empty command catalog array'
+            }
+        })
+    )
+
+    $script:StepCounter = 0
+    $script:TotalSteps = $topLevelCases.Count
+    Write-Host 'Running top-level smoke...'
+    Invoke-SmokeCaseList -Cases $topLevelCases
+}
+
 if (-not (Test-Path -Path $ExePath)) {
     throw "InsightCli executable not found: $ExePath"
 }
@@ -1487,6 +1530,8 @@ foreach ($trace in $TracePaths) {
         throw "Trace file not found: $trace"
     }
 }
+
+Invoke-TopLevelSmoke
 
 foreach ($trace in $TracePaths) {
     Invoke-NormalTraceSmoke -TracePath $trace
