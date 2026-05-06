@@ -974,6 +974,12 @@ function Invoke-NormalTraceSmoke {
             if ($resolveJson.meta.data_source -ne 'trace') {
                 throw 'Expected symbols resolve sampled response meta.data_source=trace'
             }
+            if ([string]::IsNullOrWhiteSpace([string]$resolveJson.meta.match_type)) {
+                throw 'Expected symbols resolve sampled response meta.match_type'
+            }
+            if ([string]::IsNullOrWhiteSpace([string]$resolveJson.meta.match_score)) {
+                throw 'Expected symbols resolve sampled response meta.match_score'
+            }
 
             $missingResult = Invoke-InsightCli -Args @($TracePath, 'symbols', 'resolve', '--name', 'DefinitelyMissingScope_123')
             if ($missingResult.ExitCode -ne 0) {
@@ -991,6 +997,36 @@ function Invoke-NormalTraceSmoke {
             }
             if ($missingJson.meta.data_source -ne 'trace') {
                 throw 'Expected symbols resolve missing response meta.data_source=trace'
+            }
+
+            $shortQueryResult = Invoke-InsightCli -Args @($TracePath, 'symbols', 'resolve', '--name', 'ab')
+            if ($shortQueryResult.ExitCode -ne 0) {
+                throw 'Expected exit code 0 for short-query symbols resolve'
+            }
+            $shortQueryJson = Parse-JsonOutput -Text $shortQueryResult.Text -Context 'symbols resolve short query'
+            if ($shortQueryJson.meta.reason -ne 'query_too_short') {
+                throw 'Expected symbols resolve short query to return reason=query_too_short'
+            }
+            if ($null -ne $shortQueryJson.data.symbol) {
+                throw 'Expected short-query symbols resolve to avoid direct symbol match'
+            }
+
+            $ambiguousResult = Invoke-InsightCli -Args @($TracePath, 'symbols', 'resolve', '--name', 'Tick')
+            if ($ambiguousResult.ExitCode -ne 0) {
+                throw 'Expected exit code 0 for ambiguous symbols resolve query'
+            }
+            $ambiguousJson = Parse-JsonOutput -Text $ambiguousResult.Text -Context 'symbols resolve ambiguous query'
+            if ($ambiguousJson.meta.reason -ne 'ambiguous') {
+                throw 'Expected symbols resolve ambiguous query to return reason=ambiguous'
+            }
+            if ($ambiguousJson.meta.match_type -ne 'ambiguous') {
+                throw 'Expected symbols resolve ambiguous query meta.match_type=ambiguous'
+            }
+            if ($null -eq $ambiguousJson.data.candidates -or $ambiguousJson.data.candidates.Count -lt 2) {
+                throw 'Expected symbols resolve ambiguous query to return candidate list'
+            }
+            if ($null -ne $ambiguousJson.data.symbol) {
+                throw 'Expected ambiguous symbols resolve response to avoid single symbol confirmation'
             }
         }),
         (New-SmokeCase -Message "[$([IO.Path]::GetFileName($TracePath))] Verify counters list returns discovered metadata..." -Context 'counters list' -Args @($TracePath, 'counters', 'list') -MustContain @('"data"') -Validate {

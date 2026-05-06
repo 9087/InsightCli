@@ -26,9 +26,11 @@ bool HandleSymbolsCommands(const FInsightCliRequest& Request, const FTraceContex
 
 		TSharedPtr<FJsonObject> DataObject;
 		bool bFound = false;
+		FString ResolveReason;
+		TMap<FString, FString> ResolveMeta;
 		FString FailureStage;
 		FString FailureReason;
-		if (!BuildSymbolsResolveObject(Context, ScopeName, DataObject, bFound, FailureStage, FailureReason))
+		if (!BuildSymbolsResolveObject(Context, ScopeName, DataObject, bFound, ResolveReason, ResolveMeta, FailureStage, FailureReason))
 		{
 			OutResponse = MakeTraceUnavailableError(
 				Context,
@@ -41,16 +43,26 @@ bool HandleSymbolsCommands(const FInsightCliRequest& Request, const FTraceContex
 			return true;
 		}
 
-		if (!bFound || !DataObject.IsValid())
+		if (!bFound)
 		{
-			TMap<FString, FString> Meta = MakeNotFoundMeta(Request, TEXT("not_found"), TEXT("name"), ScopeName);
+			const FString NotFoundReason = ResolveReason.IsEmpty() ? TEXT("not_found") : ResolveReason;
+			TMap<FString, FString> Meta = MakeNotFoundMeta(Request, NotFoundReason, TEXT("name"), ScopeName);
 			Meta.Add(TEXT("data_source"), TEXT("trace"));
-			OutResponse = FInsightCliResponse::Ok(MakeEnvelopeWithObject(MakeShared<FJsonObject>(), Meta));
+			for (const TPair<FString, FString>& Pair : ResolveMeta)
+			{
+				Meta.Add(Pair.Key, Pair.Value);
+			}
+			const TSharedRef<FJsonObject> Data = DataObject.IsValid() ? DataObject.ToSharedRef() : MakeShared<FJsonObject>();
+			OutResponse = FInsightCliResponse::Ok(MakeEnvelopeWithObject(Data, Meta));
 			return true;
 		}
 
 		TMap<FString, FString> Meta;
 		Meta.Add(TEXT("data_source"), TEXT("trace"));
+		for (const TPair<FString, FString>& Pair : ResolveMeta)
+		{
+			Meta.Add(Pair.Key, Pair.Value);
+		}
 		OutResponse = FInsightCliResponse::Ok(MakeEnvelopeWithObject(DataObject.ToSharedRef(), Meta));
 		return true;
 	}

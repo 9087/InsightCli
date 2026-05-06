@@ -313,6 +313,8 @@ bool BuildSymbolsResolveObject(
 	const FString& ScopeName,
 	TSharedPtr<FJsonObject>& OutObject,
 	bool& bOutFound,
+	FString& OutResolveReason,
+	TMap<FString, FString>& OutResolveMeta,
 	FString& OutFailureStage,
 	FString& OutFailureReason);
 bool BuildCounterCatalog(
