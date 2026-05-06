@@ -369,6 +369,7 @@ function Invoke-NormalTraceSmoke {
 
     $postDetailCases = @(
         (New-SmokeCase -Message "[$([IO.Path]::GetFileName($TracePath))] Verify cpu top returns scope list..." -Context 'cpu top' -Args @($TracePath, 'cpu', 'top', '--thread', 'GameThread', '--limit', '3') -MustContain @('"data"', '"scope_name"')),
+        (New-SmokeCase -Message "[$([IO.Path]::GetFileName($TracePath))] Verify cpu top thread filter ambiguity returns E1003 with candidates..." -Context 'cpu top ambiguous thread filter' -Args @($TracePath, 'cpu', 'top', '--thread', 'Thread', '--limit', '3') -MustContain @('"E1003"', '"candidates"') -ExpectNonZero),
         (New-SmokeCase -Message "[$([IO.Path]::GetFileName($TracePath))] Verify cpu stat-groups and stat-group filter..." -Context 'cpu stat-groups' -Args @($TracePath, 'cpu', 'stat-groups') -MustContain @('"data"', '"scope_count"', '"total_self_ms"') -Validate {
             param($result)
             $groupsJson = Parse-JsonOutput -Text $result.Text -Context 'cpu stat-groups'

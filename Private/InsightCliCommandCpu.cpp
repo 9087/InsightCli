@@ -140,26 +140,12 @@ bool ResolveCpuThreadFilterToTraceId(const FTraceContext& Context, const FString
 		return true;
 	}
 
-	FString DesiredThreadName;
-	if (ThreadFilter.Equals(TEXT("GameThread"), ESearchCase::IgnoreCase))
-	{
-		DesiredThreadName = TEXT("GameThread");
-		OutNormalizedThread = TEXT("GameThread");
-	}
-	else if (ThreadFilter.Equals(TEXT("RenderThread"), ESearchCase::IgnoreCase))
-	{
-		DesiredThreadName = TEXT("RenderThread");
-		OutNormalizedThread = TEXT("RenderThread");
-	}
-	else if (ThreadFilter.Equals(TEXT("RHIThread"), ESearchCase::IgnoreCase))
-	{
-		DesiredThreadName = TEXT("RHIThread");
-		OutNormalizedThread = TEXT("RHIThread");
-	}
-	else
+	FString DesiredThreadName = ThreadFilter;
+	DesiredThreadName.TrimStartAndEndInline();
+	if (DesiredThreadName.IsEmpty())
 	{
 		OutFailureStage = TEXT("thread_filter");
-		OutFailureReason = TEXT("unsupported_thread_filter");
+		OutFailureReason = TEXT("empty_thread_filter");
 		return false;
 	}
 
@@ -169,7 +155,15 @@ bool ResolveCpuThreadFilterToTraceId(const FTraceContext& Context, const FString
 		return false;
 	}
 
-	bool bFoundThread = false;
+	struct FThreadCandidate
+	{
+		uint32 Id = 0;
+		FString Name;
+	};
+
+	TArray<FThreadCandidate> ExactMatches;
+	TArray<FThreadCandidate> CaseInsensitiveExactMatches;
+	TArray<FThreadCandidate> PartialMatches;
 	{
 		TraceServices::FAnalysisSessionReadScope SessionReadScope(*Session.Get());
 		const TraceServices::IThreadProvider* ThreadProvider = Session->ReadProvider<TraceServices::IThreadProvider>(TraceServices::GetThreadProviderName());
@@ -182,28 +176,86 @@ bool ResolveCpuThreadFilterToTraceId(const FTraceContext& Context, const FString
 
 		ThreadProvider->EnumerateThreads([&](const TraceServices::FThreadInfo& ThreadInfo)
 		{
-			if (bFoundThread || ThreadInfo.Name == nullptr)
+			if (ThreadInfo.Name == nullptr)
 			{
 				return;
 			}
 
 			const FString Name = ThreadInfo.Name;
+			if (Name.Equals(DesiredThreadName, ESearchCase::CaseSensitive))
+			{
+				ExactMatches.Add({ ThreadInfo.Id, Name });
+				return;
+			}
+
+			if (Name.Equals(DesiredThreadName, ESearchCase::IgnoreCase))
+			{
+				CaseInsensitiveExactMatches.Add({ ThreadInfo.Id, Name });
+				return;
+			}
+
 			if (Name.Contains(DesiredThreadName, ESearchCase::IgnoreCase))
 			{
-				bFoundThread = true;
-				OutThreadId = ThreadInfo.Id;
+				PartialMatches.Add({ ThreadInfo.Id, Name });
 			}
 		});
 	}
 
-	if (!bFoundThread)
+	auto ResolveSingleCandidate = [&OutThreadId, &OutNormalizedThread](const TArray<FThreadCandidate>& Candidates) -> bool
 	{
-		OutFailureStage = TEXT("thread_lookup");
+		if (Candidates.Num() != 1)
+		{
+			return false;
+		}
+
+		OutThreadId = Candidates[0].Id;
+		OutNormalizedThread = Candidates[0].Name;
+		return true;
+	};
+
+	if (ResolveSingleCandidate(ExactMatches) || ResolveSingleCandidate(CaseInsensitiveExactMatches) || ResolveSingleCandidate(PartialMatches))
+	{
+		return true;
+	}
+
+	const TArray<FThreadCandidate>* AmbiguousSet = nullptr;
+	if (ExactMatches.Num() > 1)
+	{
+		AmbiguousSet = &ExactMatches;
+	}
+	else if (CaseInsensitiveExactMatches.Num() > 1)
+	{
+		AmbiguousSet = &CaseInsensitiveExactMatches;
+	}
+	else if (PartialMatches.Num() > 1)
+	{
+		AmbiguousSet = &PartialMatches;
+	}
+
+	if (AmbiguousSet != nullptr)
+	{
+		TArray<FString> CandidateNames;
+		CandidateNames.Reserve(AmbiguousSet->Num());
+		for (const FThreadCandidate& Candidate : *AmbiguousSet)
+		{
+			CandidateNames.Add(Candidate.Name);
+		}
+		CandidateNames.Sort();
+		OutFailureStage = TEXT("thread_filter_ambiguous");
+		OutFailureReason = FString::Join(CandidateNames, TEXT(","));
+		return false;
+	}
+
+	if (ExactMatches.IsEmpty() && CaseInsensitiveExactMatches.IsEmpty() && PartialMatches.IsEmpty())
+	{
+		OutFailureStage = TEXT("thread_filter_not_found");
 		OutFailureReason = TEXT("requested cpu thread not found in trace");
 		return false;
 	}
 
-	return true;
+	OutFailureStage = TEXT("thread_filter");
+	OutFailureReason = TEXT("failed to resolve thread filter");
+	return false;
 }
 
 bool BuildCpuTopSamples(

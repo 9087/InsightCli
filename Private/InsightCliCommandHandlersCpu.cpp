@@ -140,22 +140,28 @@ bool HandleCpuCommands(const FInsightCliRequest& Request, const FTraceContext& C
 		FString NormalizedThread;
 		if (bHasThreadFilter)
 		{
-			if (!ThreadFilter.Equals(TEXT("GameThread"), ESearchCase::IgnoreCase)
-				&& !ThreadFilter.Equals(TEXT("RenderThread"), ESearchCase::IgnoreCase)
-				&& !ThreadFilter.Equals(TEXT("RHIThread"), ESearchCase::IgnoreCase)
-				&& !ThreadFilter.IsNumeric())
-			{
-				TMap<FString, FString> Meta = MakeNotFoundMeta(Request, TEXT("unsupported_filter"), TEXT("thread"), ThreadFilter);
-				Meta.Add(TEXT("limit"), FString::FromInt(Limit));
-				OutResponse = FInsightCliResponse::Ok(MakeEnvelopeWithArray({}, Meta));
-				return true;
-			}
-
 			uint32 ResolvedThreadId = 0;
 			FString FailureStage;
 			FString FailureReason;
 			if (!ResolveCpuThreadFilterToTraceId(Context, ThreadFilter, ResolvedThreadId, NormalizedThread, FailureStage, FailureReason))
 			{
+				if (FailureStage == TEXT("thread_filter_not_found"))
+				{
+					TMap<FString, FString> Meta = MakeNotFoundMeta(Request, TEXT("not_found"), TEXT("thread"), ThreadFilter);
+					Meta.Add(TEXT("limit"), FString::FromInt(Limit));
+					OutResponse = FInsightCliResponse::Ok(MakeEnvelopeWithArray({}, Meta));
+					return true;
+				}
+
+				if (FailureStage == TEXT("thread_filter_ambiguous"))
+				{
+					TMap<FString, FString> Details;
+					Details.Add(TEXT("thread_filter"), ThreadFilter);
+					Details.Add(TEXT("candidates"), FailureReason);
+					OutResponse = MakeOptionError(TEXT("thread filter is ambiguous; provide a more specific thread name or numeric thread id."), Details);
+					return true;
+				}
+
 				OutResponse = MakeTraceUnavailableError(
 					Context,
 					TEXT("cpu.top"),
@@ -337,6 +343,22 @@ bool HandleCpuCommands(const FInsightCliRequest& Request, const FTraceContext& C
 			FString ThreadFailureReason;
 			if (!ResolveCpuThreadFilterToTraceId(Context, ThreadFilter, ResolvedThreadId, NormalizedThread, ThreadFailureStage, ThreadFailureReason))
 			{
+				if (ThreadFailureStage == TEXT("thread_filter_not_found"))
+				{
+					TMap<FString, FString> Meta = MakeNotFoundMeta(Request, TEXT("not_found"), TEXT("thread"), ThreadFilter);
+					OutResponse = FInsightCliResponse::Ok(MakeEnvelopeWithArray({}, Meta));
+					return true;
+				}
+
+				if (ThreadFailureStage == TEXT("thread_filter_ambiguous"))
+				{
+					TMap<FString, FString> Details;
+					Details.Add(TEXT("thread_filter"), ThreadFilter);
+					Details.Add(TEXT("candidates"), ThreadFailureReason);
+					OutResponse = MakeOptionError(TEXT("thread filter is ambiguous; provide a more specific thread name or numeric thread id."), Details);
+					return true;
+				}
+
 				OutResponse = MakeTraceUnavailableError(
 					Context,
 					TEXT("cpu.stack"),
@@ -423,22 +445,28 @@ bool HandleCpuCommands(const FInsightCliRequest& Request, const FTraceContext& C
 		FString NormalizedThread;
 		if (bHasThreadFilter)
 		{
-			if (!ThreadFilter.Equals(TEXT("GameThread"), ESearchCase::IgnoreCase)
-				&& !ThreadFilter.Equals(TEXT("RenderThread"), ESearchCase::IgnoreCase)
-				&& !ThreadFilter.Equals(TEXT("RHIThread"), ESearchCase::IgnoreCase)
-				&& !ThreadFilter.IsNumeric())
-			{
-				TMap<FString, FString> Meta = MakeNotFoundMeta(Request, TEXT("unsupported_filter"), TEXT("thread"), ThreadFilter);
-				Meta.Add(TEXT("limit"), FString::FromInt(Limit));
-				OutResponse = FInsightCliResponse::Ok(MakeEnvelopeWithArray({}, Meta));
-				return true;
-			}
-
 			uint32 ResolvedThreadId = 0;
 			FString FailureStage;
 			FString FailureReason;
 			if (!ResolveCpuThreadFilterToTraceId(Context, ThreadFilter, ResolvedThreadId, NormalizedThread, FailureStage, FailureReason))
 			{
+				if (FailureStage == TEXT("thread_filter_not_found"))
+				{
+					TMap<FString, FString> Meta = MakeNotFoundMeta(Request, TEXT("not_found"), TEXT("thread"), ThreadFilter);
+					Meta.Add(TEXT("limit"), FString::FromInt(Limit));
+					OutResponse = FInsightCliResponse::Ok(MakeEnvelopeWithArray({}, Meta));
+					return true;
+				}
+
+				if (FailureStage == TEXT("thread_filter_ambiguous"))
+				{
+					TMap<FString, FString> Details;
+					Details.Add(TEXT("thread_filter"), ThreadFilter);
+					Details.Add(TEXT("candidates"), FailureReason);
+					OutResponse = MakeOptionError(TEXT("thread filter is ambiguous; provide a more specific thread name or numeric thread id."), Details);
+					return true;
+				}
+
 				OutResponse = MakeTraceUnavailableError(
 					Context,
 					TEXT("cpu.hot-functions"),
