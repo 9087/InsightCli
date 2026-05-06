@@ -901,8 +901,8 @@ function Invoke-NormalTraceSmoke {
         (New-SmokeCase -Message "[$([IO.Path]::GetFileName($TracePath))] Verify gc summary returns structured aggregation..." -Context 'gc summary' -Args @($TracePath, 'gc', 'summary') -MustContain @('"data"', '"gc_count"', '"source"') -Validate {
             param($result)
             $json = Parse-JsonOutput -Text $result.Text -Context 'gc summary'
-            if ($json.meta.source -ne 'cpu_scope_pattern') {
-                throw 'Expected gc summary meta.source=cpu_scope_pattern'
+            if ($json.meta.source -ne 'trace_timer_strict') {
+                throw 'Expected gc summary meta.source=trace_timer_strict'
             }
             if ($null -eq $json.data.avg_gc_ms -or $null -eq $json.data.max_gc_ms) {
                 throw 'Expected gc summary to include avg_gc_ms and max_gc_ms'
@@ -914,7 +914,16 @@ function Invoke-NormalTraceSmoke {
             if ($json.data.Count -gt 3) {
                 throw 'Expected gc longest count <= limit'
             }
+            if ($json.meta.source -ne 'trace_timer_strict') {
+                throw 'Expected gc longest meta.source=trace_timer_strict'
+            }
             if ($json.data.Count -gt 0) {
+                foreach ($item in $json.data) {
+                    $name = [string]$item.scope_name
+                    if ($name -match 'GeonSweep') {
+                        throw 'Expected gc longest to exclude non-GC GeonSweep events'
+                    }
+                }
                 Assert-Descending -Items $json.data -Property 'duration_ms' -Context 'gc longest'
             }
         }),

@@ -31,7 +31,6 @@ bool IsGcScopeName(const FString& ScopeName)
 		TEXT("CollectGarbageInternal"),
 		TEXT("IncrementalPurgeGarbage"),
 		TEXT("Reachability"),
-		TEXT("Sweep"),
 		TEXT("MarkObjectsAsUnreachable"),
 		TEXT("UnhashUnreachableObjects"),
 		TEXT("PurgeGarbage"),
@@ -56,8 +55,8 @@ FString ClassifyGcStage(const FString& ScopeName)
 	{
 		return TEXT("reachability");
 	}
-	if (ScopeName.Contains(TEXT("Sweep"), ESearchCase::IgnoreCase)
-		|| ScopeName.Contains(TEXT("Purge"), ESearchCase::IgnoreCase)
+	if (ScopeName.Contains(TEXT("PurgeGarbage"), ESearchCase::IgnoreCase)
+		|| ScopeName.Contains(TEXT("IncrementalPurgeGarbage"), ESearchCase::IgnoreCase)
 		|| ScopeName.Contains(TEXT("UnhashUnreachableObjects"), ESearchCase::IgnoreCase))
 	{
 		return TEXT("sweep");
@@ -327,8 +326,8 @@ bool HandleGcCommands(const FInsightCliRequest& Request, const FTraceContext& Co
 		}
 
 		TMap<FString, FString> Meta;
-		Meta.Add(TEXT("source"), TEXT("cpu_scope_pattern"));
-		Meta.Add(TEXT("match_pattern"), TEXT("CollectGarbage*,Reachability,Sweep,Purge*"));
+		Meta.Add(TEXT("source"), TEXT("trace_timer_strict"));
+		Meta.Add(TEXT("match_pattern"), TEXT("CollectGarbage*,CollectGarbageInternal,IncrementalPurgeGarbage,Reachability,MarkObjectsAsUnreachable,UnhashUnreachableObjects,PurgeGarbage,GarbageCollection"));
 		AppendTimeWindowMeta(TimeWindow, Meta);
 		OutResponse = FInsightCliResponse::Ok(MakeEnvelopeWithObject(MakeGcSummaryObject(Events), Meta));
 		return true;
@@ -385,8 +384,8 @@ bool HandleGcCommands(const FInsightCliRequest& Request, const FTraceContext& Co
 
 		TMap<FString, FString> Meta;
 		Meta.Add(TEXT("limit"), FString::FromInt(Limit));
-		Meta.Add(TEXT("source"), TEXT("cpu_scope_pattern"));
-		Meta.Add(TEXT("match_pattern"), TEXT("CollectGarbage*,Reachability,Sweep,Purge*"));
+		Meta.Add(TEXT("source"), TEXT("trace_timer_strict"));
+		Meta.Add(TEXT("match_pattern"), TEXT("CollectGarbage*,CollectGarbageInternal,IncrementalPurgeGarbage,Reachability,MarkObjectsAsUnreachable,UnhashUnreachableObjects,PurgeGarbage,GarbageCollection"));
 		AppendTimeWindowMeta(TimeWindow, Meta);
 		OutResponse = FInsightCliResponse::Ok(MakeEnvelopeWithArray(Data, Meta));
 		return true;
@@ -452,8 +451,8 @@ bool HandleGcCommands(const FInsightCliRequest& Request, const FTraceContext& Co
 
 		TMap<FString, FString> Meta;
 		Meta.Add(TEXT("limit"), FString::FromInt(Limit));
-		Meta.Add(TEXT("source"), TEXT("cpu_scope_pattern"));
-		Meta.Add(TEXT("match_pattern"), TEXT("CollectGarbage*,Reachability,Sweep,Purge*"));
+		Meta.Add(TEXT("source"), TEXT("trace_timer_strict"));
+		Meta.Add(TEXT("match_pattern"), TEXT("CollectGarbage*,CollectGarbageInternal,IncrementalPurgeGarbage,Reachability,MarkObjectsAsUnreachable,UnhashUnreachableObjects,PurgeGarbage,GarbageCollection"));
 		AppendTimeWindowMeta(TimeWindow, Meta);
 		OutResponse = FInsightCliResponse::Ok(MakeEnvelopeWithArray(Data, Meta));
 		return true;
