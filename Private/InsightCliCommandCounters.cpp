@@ -8,6 +8,42 @@
 
 namespace UE::InsightCli::Internal
 {
+namespace
+{
+void ResolveCounterUnit(const FString& Name, TraceServices::ECounterDisplayHint DisplayHint, FString& OutUnit, FString& OutUnitSource)
+{
+	if (DisplayHint == TraceServices::CounterDisplayHint_Memory)
+	{
+		OutUnit = TEXT("bytes");
+		OutUnitSource = TEXT("trace");
+		return;
+	}
+
+	const FString Lower = Name.ToLower();
+	if (Lower.EndsWith(TEXT("ms"), ESearchCase::CaseSensitive)
+		|| Lower.Contains(TEXT("_ms"), ESearchCase::CaseSensitive)
+		|| Lower.Contains(TEXT("time"), ESearchCase::CaseSensitive)
+		|| Lower.Contains(TEXT("duration"), ESearchCase::CaseSensitive))
+	{
+		OutUnit = TEXT("ms");
+		OutUnitSource = TEXT("inferred");
+		return;
+	}
+
+	if (Lower.Contains(TEXT("byte"), ESearchCase::CaseSensitive)
+		|| Lower.Contains(TEXT("memory"), ESearchCase::CaseSensitive)
+		|| Lower.Contains(TEXT("mem"), ESearchCase::CaseSensitive))
+	{
+		OutUnit = TEXT("bytes");
+		OutUnitSource = TEXT("inferred");
+		return;
+	}
+
+	OutUnit = TEXT("unknown");
+	OutUnitSource = TEXT("inferred");
+}
+}
+
 bool BuildCounterCatalog(
 	const FTraceContext& Context,
 	TArray<FCounterCatalogEntry>& OutCatalog,
@@ -24,28 +60,11 @@ bool BuildCounterCatalog(
 		return false;
 	}
 
-	const auto InferUnit = [](const FString& Name, TraceServices::ECounterDisplayHint DisplayHint) -> FString
-	{
-		if (DisplayHint == TraceServices::CounterDisplayHint_Memory)
-		{
-			return TEXT("bytes");
-		}
-
-		if (Name.EndsWith(TEXT("Ms"), ESearchCase::IgnoreCase)
-			|| Name.Contains(TEXT("time"), ESearchCase::IgnoreCase)
-			|| Name.Contains(TEXT("duration"), ESearchCase::IgnoreCase))
-		{
-			return TEXT("ms");
-		}
-
-		return TEXT("count");
-	};
-
 	{
 		TraceServices::FAnalysisSessionReadScope SessionReadScope(*Session.Get());
 		const TraceServices::ICounterProvider& CounterProvider = TraceServices::ReadCounterProvider(*Session.Get());
 
-		CounterProvider.EnumerateCounters([&OutCatalog, &InferUnit](uint32, const TraceServices::ICounter& Counter)
+		CounterProvider.EnumerateCounters([&OutCatalog](uint32, const TraceServices::ICounter& Counter)
 		{
 			int32 SampleCount = 0;
 			if (Counter.IsFloatingPoint())
@@ -66,7 +85,7 @@ bool BuildCounterCatalog(
 			FCounterCatalogEntry Entry;
 			Entry.Name = Counter.GetName() != nullptr ? Counter.GetName() : TEXT("<unnamed>");
 			Entry.Type = Counter.IsFloatingPoint() ? TEXT("float") : TEXT("int64");
-			Entry.Unit = InferUnit(Entry.Name, Counter.GetDisplayHint());
+			ResolveCounterUnit(Entry.Name, Counter.GetDisplayHint(), Entry.Unit, Entry.UnitSource);
 			Entry.SampleCount = SampleCount;
 			Entry.bTraceBacked = true;
 			OutCatalog.Add(MoveTemp(Entry));
@@ -137,6 +156,7 @@ bool BuildCounterSeries(
 	TArray<FCounterPoint>& OutSeries,
 	FString& OutCounterType,
 	FString& OutCounterUnit,
+	FString& OutCounterUnitSource,
 	FString& OutFailureStage,
 	FString& OutFailureReason,
 	TOptional<double> WindowStartMs,
@@ -145,6 +165,7 @@ bool BuildCounterSeries(
 	OutSeries.Reset();
 	OutCounterType.Reset();
 	OutCounterUnit.Reset();
+	OutCounterUnitSource.Reset();
 	OutFailureStage.Reset();
 	OutFailureReason.Reset();
 
@@ -153,23 +174,6 @@ bool BuildCounterSeries(
 	{
 		return false;
 	}
-
-	const auto InferUnit = [](const FString& Name, TraceServices::ECounterDisplayHint DisplayHint) -> FString
-	{
-		if (DisplayHint == TraceServices::CounterDisplayHint_Memory)
-		{
-			return TEXT("bytes");
-		}
-
-		if (Name.EndsWith(TEXT("Ms"), ESearchCase::IgnoreCase)
-			|| Name.Contains(TEXT("time"), ESearchCase::IgnoreCase)
-			|| Name.Contains(TEXT("duration"), ESearchCase::IgnoreCase))
-		{
-			return TEXT("ms");
-		}
-
-		return TEXT("count");
-	};
 
 	double DurationSec = 0.0;
 	{
@@ -194,7 +198,7 @@ bool BuildCounterSeries(
 
 			bFoundCounter = true;
 			OutCounterType = Counter.IsFloatingPoint() ? TEXT("float") : TEXT("int64");
-			OutCounterUnit = InferUnit(Name, Counter.GetDisplayHint());
+			ResolveCounterUnit(Name, Counter.GetDisplayHint(), OutCounterUnit, OutCounterUnitSource);
 
 			if (Counter.IsFloatingPoint())
 			{

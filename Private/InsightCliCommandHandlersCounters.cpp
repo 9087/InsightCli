@@ -39,6 +39,7 @@ bool HandleCountersCommands(const FInsightCliRequest& Request, const FTraceConte
 			Item->SetStringField(TEXT("name"), Entry.Name);
 			Item->SetStringField(TEXT("type"), Entry.Type);
 			Item->SetStringField(TEXT("unit"), Entry.Unit);
+			Item->SetStringField(TEXT("unit_source"), Entry.UnitSource);
 			Item->SetNumberField(TEXT("sample_count"), Entry.SampleCount);
 			Item->SetBoolField(TEXT("trace_backed"), Entry.bTraceBacked);
 			Data.Add(MakeShared<FJsonValueObject>(Item));
@@ -87,6 +88,7 @@ bool HandleCountersCommands(const FInsightCliRequest& Request, const FTraceConte
 		TArray<FCounterPoint> Series;
 		FString CounterType;
 		FString CounterUnit;
+		FString CounterUnitSource;
 		FString FailureStage;
 		FString FailureReason;
 		if (!BuildCounterSeries(
@@ -95,6 +97,7 @@ bool HandleCountersCommands(const FInsightCliRequest& Request, const FTraceConte
 			Series,
 			CounterType,
 			CounterUnit,
+			CounterUnitSource,
 			FailureStage,
 			FailureReason,
 			TimeWindow.StartMs,
@@ -126,6 +129,7 @@ bool HandleCountersCommands(const FInsightCliRequest& Request, const FTraceConte
 		Meta.Add(TEXT("counter_name"), CounterEntry.Name);
 		Meta.Add(TEXT("counter_type"), CounterType);
 		Meta.Add(TEXT("counter_unit"), CounterUnit);
+		Meta.Add(TEXT("unit_source"), CounterUnitSource);
 		Meta.Add(TEXT("data_source"), TEXT("trace"));
 		AppendTimeWindowMeta(TimeWindow, Meta);
 		OutResponse = FInsightCliResponse::Ok(MakeEnvelopeWithArray(Data, Meta));
@@ -160,6 +164,7 @@ bool HandleCountersCommands(const FInsightCliRequest& Request, const FTraceConte
 		TArray<FCounterPoint> Series;
 		FString CounterType;
 		FString CounterUnit;
+		FString CounterUnitSource;
 		FString FailureStage;
 		FString FailureReason;
 		if (!BuildCounterSeries(
@@ -168,6 +173,7 @@ bool HandleCountersCommands(const FInsightCliRequest& Request, const FTraceConte
 			Series,
 			CounterType,
 			CounterUnit,
+			CounterUnitSource,
 			FailureStage,
 			FailureReason))
 		{
@@ -186,6 +192,7 @@ bool HandleCountersCommands(const FInsightCliRequest& Request, const FTraceConte
 		TMap<FString, FString> Meta;
 		Meta.Add(TEXT("counter_type"), CounterType);
 		Meta.Add(TEXT("counter_unit"), CounterUnit);
+		Meta.Add(TEXT("unit_source"), CounterUnitSource);
 		Meta.Add(TEXT("data_source"), TEXT("trace"));
 		OutResponse = FInsightCliResponse::Ok(MakeEnvelopeWithObject(MakeCounterStatsObject(Series, CounterEntry.Name), Meta));
 		return true;

@@ -36,6 +36,7 @@ struct FCounterCatalogEntry
 	FString Name;
 	FString Type;
 	FString Unit;
+	FString UnitSource;
 	int32 SampleCount = 0;
 	bool bTraceBacked = true;
 };
@@ -334,6 +335,7 @@ bool BuildCounterSeries(
 	TArray<FCounterPoint>& OutSeries,
 	FString& OutCounterType,
 	FString& OutCounterUnit,
+	FString& OutCounterUnitSource,
 	FString& OutFailureStage,
 	FString& OutFailureReason,
 	TOptional<double> WindowStartMs = {},

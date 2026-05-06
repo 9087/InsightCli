@@ -1045,6 +1045,12 @@ function Invoke-NormalTraceSmoke {
                 if ([string]::IsNullOrWhiteSpace([string]$counter.unit)) {
                     throw 'Expected counter unit in counters list rows'
                 }
+                if ([string]::IsNullOrWhiteSpace([string]$counter.unit_source)) {
+                    throw 'Expected counter unit_source in counters list rows'
+                }
+                if (@('trace', 'inferred') -notcontains ([string]$counter.unit_source)) {
+                    throw "Expected counter unit_source to be trace or inferred. Actual: $([string]$counter.unit_source)"
+                }
             }
         }),
         (New-SmokeCase -Message "[$([IO.Path]::GetFileName($TracePath))] Verify counters series returns data array..." -Context 'counters series' -Args @($TracePath, 'counters', 'list') -MustContain @('"data"') -Validate {
@@ -1072,6 +1078,9 @@ function Invoke-NormalTraceSmoke {
             }
             if ($seriesJson.meta.counter_name -ne $counterName) {
                 throw 'Expected counters series meta.counter_name to echo query name'
+            }
+            if (@('trace', 'inferred') -notcontains ([string]$seriesJson.meta.unit_source)) {
+                throw 'Expected counters series meta.unit_source to be trace or inferred'
             }
             if ($seriesJson.data.Count -gt 1) {
                 Assert-Ascending -Items $seriesJson.data -Property 'timestamp_ms' -Context 'counters series'
@@ -1108,6 +1117,9 @@ function Invoke-NormalTraceSmoke {
             $statsJson = Parse-JsonOutput -Text $statsResult.Text -Context 'counters stats discovered counter'
             if ($statsJson.meta.data_source -ne 'trace') {
                 throw 'Expected counters stats meta.data_source=trace'
+            }
+            if (@('trace', 'inferred') -notcontains ([string]$statsJson.meta.unit_source)) {
+                throw 'Expected counters stats meta.unit_source to be trace or inferred'
             }
             if ($statsJson.data.counter_name -ne $counterName) {
                 throw 'Expected counters stats to echo counter_name'
