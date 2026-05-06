@@ -13,6 +13,98 @@ namespace UE::InsightCli::Internal
 {
 namespace
 {
+bool IsWordBoundaryChar(const TCHAR Char)
+{
+	return !(FChar::IsAlnum(Char) || Char == TEXT('_'));
+}
+
+bool ContainsToken(const FString& HaystackLower, const TCHAR* TokenLower)
+{
+	const FString Token(TokenLower);
+	if (Token.IsEmpty() || HaystackLower.IsEmpty())
+	{
+		return false;
+	}
+
+	int32 SearchStart = 0;
+	while (SearchStart < HaystackLower.Len())
+	{
+		const int32 FoundIndex = HaystackLower.Find(Token, ESearchCase::CaseSensitive, ESearchDir::FromStart, SearchStart);
+		if (FoundIndex == INDEX_NONE)
+		{
+			return false;
+		}
+
+		const int32 LeftIndex = FoundIndex - 1;
+		const int32 RightIndex = FoundIndex + Token.Len();
+		const bool bLeftOk = (LeftIndex < 0) || IsWordBoundaryChar(HaystackLower[LeftIndex]);
+		const bool bRightOk = (RightIndex >= HaystackLower.Len()) || IsWordBoundaryChar(HaystackLower[RightIndex]);
+		if (bLeftOk && bRightOk)
+		{
+			return true;
+		}
+
+		SearchStart = FoundIndex + 1;
+	}
+
+	return false;
+}
+}
+
+FString ClassifyCpuStatGroup(const FString& ScopeName)
+{
+	const FString Lower = ScopeName.ToLower();
+
+	if (Lower.Contains(TEXT("uworld::tick"), ESearchCase::CaseSensitive)
+		|| Lower.Contains(TEXT("world tick"), ESearchCase::CaseSensitive)
+		|| ContainsToken(Lower, TEXT("worldtick")))
+	{
+		return TEXT("world_tick");
+	}
+
+	if (ContainsToken(Lower, TEXT("animgraph"))
+		|| ContainsToken(Lower, TEXT("animation"))
+		|| ContainsToken(Lower, TEXT("animinstance"))
+		|| ContainsToken(Lower, TEXT("anim")))
+	{
+		return TEXT("animation");
+	}
+
+	if (ContainsToken(Lower, TEXT("physics"))
+		|| ContainsToken(Lower, TEXT("chaos"))
+		|| ContainsToken(Lower, TEXT("broadphase"))
+		|| ContainsToken(Lower, TEXT("narrowphase"))
+		|| ContainsToken(Lower, TEXT("constraint"))
+		|| ContainsToken(Lower, TEXT("solver"))
+		|| ContainsToken(Lower, TEXT("collision")))
+	{
+		return TEXT("physics");
+	}
+
+	if (Lower.Contains(TEXT("collectgarbage"), ESearchCase::CaseSensitive)
+		|| Lower.Contains(TEXT("collectgarbageinternal"), ESearchCase::CaseSensitive)
+		|| Lower.Contains(TEXT("incrementalpurgegarbage"), ESearchCase::CaseSensitive)
+		|| Lower.Contains(TEXT("reachability"), ESearchCase::CaseSensitive)
+		|| Lower.Contains(TEXT("markobjectsasunreachable"), ESearchCase::CaseSensitive)
+		|| Lower.Contains(TEXT("unhashunreachableobjects"), ESearchCase::CaseSensitive)
+		|| Lower.Contains(TEXT("purgegarbage"), ESearchCase::CaseSensitive)
+		|| Lower.Contains(TEXT("garbagecollection"), ESearchCase::CaseSensitive))
+	{
+		return TEXT("gc");
+	}
+
+	if (ContainsToken(Lower, TEXT("slate"))
+		|| ContainsToken(Lower, TEXT("umg"))
+		|| ContainsToken(Lower, TEXT("widget")))
+	{
+		return TEXT("slate");
+	}
+
+	return TEXT("other");
+}
+
+namespace
+{
 bool TryParseInt(const FString& Text, int32& OutValue)
 {
 	if (Text.IsEmpty())

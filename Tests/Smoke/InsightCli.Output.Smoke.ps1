@@ -378,11 +378,22 @@ function Invoke-NormalTraceSmoke {
             if ($groupsJson.data.Count -lt 3) {
                 throw 'Expected cpu stat-groups to return at least 3 groups'
             }
+            if ($groupsJson.meta.classifier -ne 'strict_token') {
+                throw 'Expected cpu stat-groups meta.classifier=strict_token'
+            }
+
+            $allowedGroups = @('world_tick', 'animation', 'physics', 'gc', 'slate', 'other')
+            foreach ($group in $groupsJson.data) {
+                $name = [string]$group.name
+                if ([string]::IsNullOrWhiteSpace($name)) {
+                    throw 'Expected cpu stat-groups rows to include non-empty name'
+                }
+                if ($allowedGroups -notcontains $name) {
+                    throw "Expected cpu stat-groups name to be in strict set. Actual: $name"
+                }
+            }
 
             $groupName = [string]$groupsJson.data[0].name
-            if ([string]::IsNullOrWhiteSpace($groupName)) {
-                throw 'Expected cpu stat-groups rows to include non-empty name'
-            }
 
             $fullTopResult = Invoke-InsightCli -Args @($TracePath, 'cpu', 'top', '--limit', '20')
             if ($fullTopResult.ExitCode -ne 0) {
@@ -398,6 +409,9 @@ function Invoke-NormalTraceSmoke {
 
             if ($filteredTopJson.meta.stat_group -ne $groupName.ToLower()) {
                 throw 'Expected cpu top stat-group metadata echo in lowercase'
+            }
+            if ($filteredTopJson.meta.classifier -ne 'strict_token') {
+                throw 'Expected cpu top --stat-group meta.classifier=strict_token'
             }
             if ($filteredTopJson.data.Count -gt $fullTopJson.data.Count) {
                 throw 'Expected cpu top --stat-group row count <= baseline cpu top row count'

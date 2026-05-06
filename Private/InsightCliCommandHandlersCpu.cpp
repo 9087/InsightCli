@@ -6,38 +6,6 @@ namespace UE::InsightCli::Internal
 {
 namespace
 {
-FString ClassifyCpuStatGroup(const FString& ScopeName)
-{
-	if (ScopeName.Contains(TEXT("World Tick"), ESearchCase::IgnoreCase)
-		|| ScopeName.Contains(TEXT("UWorld::Tick"), ESearchCase::IgnoreCase)
-		|| ScopeName.Contains(TEXT("Tick"), ESearchCase::IgnoreCase))
-	{
-		return TEXT("world_tick");
-	}
-	if (ScopeName.Contains(TEXT("Anim"), ESearchCase::IgnoreCase))
-	{
-		return TEXT("animation");
-	}
-	if (ScopeName.Contains(TEXT("Physics"), ESearchCase::IgnoreCase)
-		|| ScopeName.Contains(TEXT("Chaos"), ESearchCase::IgnoreCase))
-	{
-		return TEXT("physics");
-	}
-	if (ScopeName.Contains(TEXT("Garbage"), ESearchCase::IgnoreCase)
-		|| ScopeName.Contains(TEXT("CollectGarbage"), ESearchCase::IgnoreCase)
-		|| ScopeName.Contains(TEXT("GC"), ESearchCase::IgnoreCase))
-	{
-		return TEXT("gc");
-	}
-	if (ScopeName.Contains(TEXT("Slate"), ESearchCase::IgnoreCase)
-		|| ScopeName.Contains(TEXT("UI"), ESearchCase::IgnoreCase))
-	{
-		return TEXT("slate");
-	}
-
-	return TEXT("other");
-}
-
 bool TryResolveFrameIntervalSec(const FTraceContext& Context, int32 FrameIndex, double& OutStartSec, double& OutEndSec)
 {
 	const TArray<FFrameSample> Frames = BuildFrameSamples(Context);
@@ -139,9 +107,10 @@ bool HandleCpuCommands(const FInsightCliRequest& Request, const FTraceContext& C
 		TMap<FString, FString> Meta;
 		Meta.Add(TEXT("data_source"), TEXT("trace"));
 		Meta.Add(TEXT("group_count"), FString::FromInt(Rows.Num()));
+		Meta.Add(TEXT("classifier"), TEXT("strict_token"));
 		AddMetaWarning(
 			Meta,
-			TEXT("Stat groups are inferred from scope-name heuristics."),
+			TEXT("Stat groups use strict token and explicit GC-name matching."),
 			TEXT("W2101"),
 			TEXT("Use frames detail --breakdown statgroup for per-frame context."));
 		OutResponse = FInsightCliResponse::Ok(MakeEnvelopeWithArray(Data, Meta));
@@ -298,9 +267,10 @@ bool HandleCpuCommands(const FInsightCliRequest& Request, const FTraceContext& C
 		if (bHasStatGroupFilter)
 		{
 			Meta.Add(TEXT("stat_group"), StatGroupFilter);
+			Meta.Add(TEXT("classifier"), TEXT("strict_token"));
 			AddMetaWarning(
 				Meta,
-				TEXT("stat-group filter uses scope-name heuristics."),
+				TEXT("stat-group filter uses strict token and explicit GC-name matching."),
 				TEXT("W2101"),
 				TEXT("Names may differ from engine stat declarations."));
 		}

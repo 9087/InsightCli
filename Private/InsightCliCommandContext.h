@@ -253,6 +253,7 @@ TSharedRef<FJsonObject> MakeFramesSummaryData(const TArray<FFrameSample>& Frames
 TSharedRef<FJsonObject> MakeFrameObject(const FFrameSample& Sample);
 
 // JSON/data builders: cpu
+FString ClassifyCpuStatGroup(const FString& ScopeName);
 bool ResolveCpuThreadFilterToTraceId(const FTraceContext& Context, const FString& ThreadFilter, uint32& OutThreadId, FString& OutNormalizedThread, FString& OutFailureStage, FString& OutFailureReason);
 bool BuildCpuTopSamples(
 	const FTraceContext& Context,
