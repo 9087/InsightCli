@@ -11,6 +11,40 @@ namespace UE::InsightCli::Internal
 {
 namespace
 {
+int32 ResolveDomainFrameIndex(const FFrameSample& Frame, const EFrameDomain FrameDomain)
+{
+	if (FrameDomain == EFrameDomain::Rendering)
+	{
+		return Frame.RenderingFrameIndex;
+	}
+
+	return Frame.GameFrameIndex;
+}
+
+void ResolveFrameIndicesForTimestamp(
+	const TArray<FFrameSample>& Frames,
+	const double TimestampMs,
+	int32& OutGameFrameIndex,
+	int32& OutRenderingFrameIndex,
+	int32& OutSelectedFrameIndex,
+	const EFrameDomain FrameDomain)
+{
+	OutGameFrameIndex = -1;
+	OutRenderingFrameIndex = -1;
+	OutSelectedFrameIndex = -1;
+
+	for (const FFrameSample& Frame : Frames)
+	{
+		if (Frame.FrameStartMs <= TimestampMs && TimestampMs <= Frame.FrameEndMs)
+		{
+			OutGameFrameIndex = Frame.GameFrameIndex;
+			OutRenderingFrameIndex = Frame.RenderingFrameIndex;
+			OutSelectedFrameIndex = ResolveDomainFrameIndex(Frame, FrameDomain);
+			return;
+		}
+	}
+}
+
 enum class ETaskVisitState : uint8
 {
 	NotVisited,
@@ -138,6 +172,7 @@ bool ComputeTaskCriticalPath(
 bool BuildTaskTopSamples(
 	const FTraceContext& Context,
 	TOptional<int32> FrameIndexFilter,
+	EFrameDomain FrameDomain,
 	TArray<FTaskSample>& OutSamples,
 	FString& OutFailureStage,
 	FString& OutFailureReason,
@@ -156,9 +191,9 @@ bool BuildTaskTopSamples(
 	if (FrameIndexFilter.IsSet())
 	{
 		Frames = BuildFrameSamples(Context);
-		const FFrameSample* FoundFrame = Frames.FindByPredicate([&FrameIndexFilter](const FFrameSample& Frame)
+		const FFrameSample* FoundFrame = Frames.FindByPredicate([&FrameIndexFilter, FrameDomain](const FFrameSample& Frame)
 		{
-			return Frame.FrameIndex == FrameIndexFilter.GetValue();
+			return ResolveDomainFrameIndex(Frame, FrameDomain) == FrameIndexFilter.GetValue();
 		});
 
 		if (FoundFrame == nullptr)
@@ -177,18 +212,6 @@ bool BuildTaskTopSamples(
 		return false;
 	}
 
-	const auto GetFrameIndexForTimestampMs = [&Frames](const double TimestampMs) -> int32
-	{
-		for (const FFrameSample& Frame : Frames)
-		{
-			if (Frame.FrameStartMs <= TimestampMs && TimestampMs <= Frame.FrameEndMs)
-			{
-				return Frame.FrameIndex;
-			}
-		}
-		return -1;
-	};
-
 	{
 		TraceServices::FAnalysisSessionReadScope SessionReadScope(*Session.Get());
 		const TraceServices::ITasksProvider* TasksProvider = TraceServices::ReadTasksProvider(*Session.Get());
@@ -204,7 +227,7 @@ bool BuildTaskTopSamples(
 		const double QueryEndSec = IntervalEndSec.IsSet() ? IntervalEndSec.GetValue() : Session->GetDurationSeconds();
 
 		TasksProvider->EnumerateTasks(QueryStartSec, QueryEndSec, TraceServices::ETaskEnumerationOption::Alive,
-			[&OutSamples, &ThreadProvider, &Frames, &GetFrameIndexForTimestampMs](const TraceServices::FTaskInfo& TaskInfo)
+			[&OutSamples, &ThreadProvider, &Frames, FrameDomain](const TraceServices::FTaskInfo& TaskInfo)
 			{
 				const double EnqueueSec =
 					(TaskInfo.ScheduledTimestamp != TraceServices::FTaskInfo::InvalidTimestamp) ? TaskInfo.ScheduledTimestamp :
@@ -249,7 +272,22 @@ bool BuildTaskTopSamples(
 				Task.CriticalPathDepth = Task.DependencyTaskIds.Num();
 				Task.CriticalPathMs = Task.QueueWaitMs + Task.RunMs;
 
-				Task.FrameIndex = Frames.IsEmpty() ? -1 : GetFrameIndexForTimestampMs(Task.StartMs);
+				if (!Frames.IsEmpty())
+				{
+					ResolveFrameIndicesForTimestamp(
+						Frames,
+						Task.StartMs,
+						Task.GameFrameIndex,
+						Task.RenderingFrameIndex,
+						Task.FrameIndex,
+						FrameDomain);
+				}
+				else
+				{
+					Task.FrameIndex = -1;
+					Task.GameFrameIndex = -1;
+					Task.RenderingFrameIndex = -1;
+				}
 				OutSamples.Add(MoveTemp(Task));
 				return TraceServices::ETaskEnumerationResult::Continue;
 			});
@@ -330,6 +368,8 @@ TSharedRef<FJsonObject> MakeTaskObject(const FTaskSample& Task)
 	const TSharedRef<FJsonObject> Item = MakeShared<FJsonObject>();
 	Item->SetNumberField(TEXT("task_id"), Task.TaskId);
 	Item->SetNumberField(TEXT("frame_index"), Task.FrameIndex);
+	Item->SetNumberField(TEXT("game_frame_index"), Task.GameFrameIndex);
+	Item->SetNumberField(TEXT("rendering_frame_index"), Task.RenderingFrameIndex);
 	Item->SetStringField(TEXT("task_name"), Task.TaskName);
 	Item->SetStringField(TEXT("queue_name"), Task.QueueName);
 

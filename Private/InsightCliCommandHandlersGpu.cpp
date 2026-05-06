@@ -2,10 +2,67 @@
 
 #include "InsightCliCommandContext.h"
 
+#include "TraceServices/Model/AnalysisSession.h"
+#include "TraceServices/Model/Channel.h"
+
 namespace UE::InsightCli::Internal
 {
 namespace
 {
+FString NormalizeChannelName(FString Name)
+{
+	Name = Name.ToLower();
+	Name.ReplaceInline(TEXT(" "), TEXT(""));
+	Name.ReplaceInline(TEXT("-"), TEXT(""));
+	Name.ReplaceInline(TEXT("_"), TEXT(""));
+	return Name;
+}
+
+bool CollectEnabledChannelKeys(const FTraceContext& Context, TSet<FString>& OutEnabledKeys, FString& OutFailureStage, FString& OutFailureReason)
+{
+	OutEnabledKeys.Reset();
+	OutFailureStage.Reset();
+	OutFailureReason.Reset();
+
+	TSharedPtr<const TraceServices::IAnalysisSession> Session;
+	if (!AcquireAnalysisSession(Context, Session, OutFailureStage, OutFailureReason))
+	{
+		return false;
+	}
+
+	TraceServices::FAnalysisSessionReadScope SessionReadScope(*Session.Get());
+	const TraceServices::IChannelProvider* ChannelProvider = TraceServices::ReadChannelProvider(*Session.Get());
+	if (ChannelProvider == nullptr)
+	{
+		OutFailureStage = TEXT("channel_provider");
+		OutFailureReason = TEXT("channel provider not available");
+		return false;
+	}
+
+	for (const TraceServices::FChannelEntry& Channel : ChannelProvider->GetChannels())
+	{
+		if (Channel.bIsEnabled)
+		{
+			OutEnabledKeys.Add(NormalizeChannelName(Channel.Name));
+		}
+	}
+
+	return true;
+}
+
+bool HasAnyChannel(const TSet<FString>& EnabledChannels, const TArray<FString>& Candidates)
+{
+	for (const FString& Candidate : Candidates)
+	{
+		if (EnabledChannels.Contains(NormalizeChannelName(Candidate)))
+		{
+			return true;
+		}
+	}
+
+	return false;
+}
+
 bool TryResolveRhiWindow(
 	const FInsightCliRequest& Request,
 	const FTraceContext& Context,
@@ -517,6 +574,38 @@ bool HandleGpuCommands(const FInsightCliRequest& Request, const FTraceContext& C
 			return true;
 		}
 
+		TSet<FString> EnabledChannelKeys;
+		FString ChannelFailureStage;
+		FString ChannelFailureReason;
+		if (!CollectEnabledChannelKeys(Context, EnabledChannelKeys, ChannelFailureStage, ChannelFailureReason))
+		{
+			OutResponse = MakeTraceUnavailableError(
+				Context,
+				Request.Action == TEXT("top-materials") ? TEXT("rhi.top-materials") : TEXT("rhi.top-meshes"),
+				ChannelFailureStage,
+				ChannelFailureReason,
+				TEXT("channel_provider"),
+				TEXT("channel provider unavailable"),
+				TEXT("RHI material/mesh dimensions are unavailable for this trace."),
+				{{TEXT("unavailable_reason"), TEXT("provider_unavailable")}});
+			return true;
+		}
+
+		const bool bHasRhiDrawChannels = HasAnyChannel(EnabledChannelKeys, { TEXT("RHIDraws"), TEXT("RDG") });
+		if (!bHasRhiDrawChannels)
+		{
+			OutResponse = MakeTraceUnavailableError(
+				Context,
+				Request.Action == TEXT("top-materials") ? TEXT("rhi.top-materials") : TEXT("rhi.top-meshes"),
+				TEXT("channel_disabled"),
+				TEXT("required RHIDraws/RDG channel is disabled"),
+				TEXT("channel_disabled"),
+				TEXT("required RHIDraws/RDG channel is disabled"),
+				TEXT("RHI material/mesh dimensions are unavailable because required channels are disabled."),
+				{{TEXT("unavailable_reason"), TEXT("channel_disabled")}, {TEXT("required_channel"), TEXT("RHIDraws")}});
+			return true;
+		}
+
 		TOptional<double> IntervalStartSec;
 		TOptional<double> IntervalEndSec;
 		double IgnoredRhiThreadMs = 0.0;
@@ -544,23 +633,53 @@ bool HandleGpuCommands(const FInsightCliRequest& Request, const FTraceContext& C
 			return true;
 		}
 
-		int64 TotalDrawCalls = 0;
+		TMap<FString, int64> DrawCallsByName;
 		for (const FGpuScopeSample& Sample : Samples)
 		{
-			TotalDrawCalls += FMath::Max(0, Sample.CallCount);
+			const FString ProxyName = Sample.ScopeName.IsEmpty() ? TEXT("<unknown_scope>") : Sample.ScopeName;
+			int64& DrawCallCount = DrawCallsByName.FindOrAdd(ProxyName);
+			DrawCallCount += FMath::Max(0, Sample.CallCount);
 		}
 
-		TArray<TSharedPtr<FJsonValue>> Data;
-		if (Limit > 0)
+		struct FRhiTopRow
 		{
+			FString Name;
+			int64 DrawCallCount = 0;
+		};
+
+		TArray<FRhiTopRow> Rows;
+		Rows.Reserve(DrawCallsByName.Num());
+		for (const TPair<FString, int64>& Pair : DrawCallsByName)
+		{
+			FRhiTopRow& Row = Rows.AddDefaulted_GetRef();
+			Row.Name = Pair.Key;
+			Row.DrawCallCount = Pair.Value;
+		}
+
+		Rows.Sort([](const FRhiTopRow& A, const FRhiTopRow& B)
+		{
+			if (A.DrawCallCount == B.DrawCallCount)
+			{
+				return A.Name < B.Name;
+			}
+			return A.DrawCallCount > B.DrawCallCount;
+		});
+
+		TArray<TSharedPtr<FJsonValue>> Data;
+		const int32 TakeCount = FMath::Min(Limit, Rows.Num());
+		Data.Reserve(TakeCount);
+		for (int32 Index = 0; Index < TakeCount; ++Index)
+		{
+			const FRhiTopRow& Row = Rows[Index];
 			const TSharedRef<FJsonObject> Item = MakeShared<FJsonObject>();
-			Item->SetStringField(TEXT("name"), TEXT("unknown"));
-			Item->SetNumberField(TEXT("draw_call_count"), static_cast<double>(TotalDrawCalls));
+			Item->SetStringField(TEXT("name"), Row.Name);
+			Item->SetNumberField(TEXT("draw_call_count"), static_cast<double>(Row.DrawCallCount));
 			Data.Add(MakeShared<FJsonValueObject>(Item));
 		}
 
 		Meta.Add(TEXT("limit"), FString::FromInt(Limit));
-		Meta.Add(TEXT("approximation"), TEXT("material/mesh channels unavailable; using unknown bucket from gpu passes"));
+		Meta.Add(TEXT("data_source"), TEXT("approx_cpu_gpu"));
+		Meta.Add(TEXT("approximation"), TEXT("proxy_name_from_gpu_scope"));
 		OutResponse = FInsightCliResponse::Ok(MakeEnvelopeWithArray(Data, Meta));
 		return true;
 	}

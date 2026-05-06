@@ -1,6 +1,7 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
 #include "InsightCliCommandContext.h"
+#include "InsightCliCommandRegistry.h"
 
 #include "TraceServices/Containers/Tables.h"
 #include "TraceServices/Model/AnalysisSession.h"
@@ -10,6 +11,35 @@ namespace UE::InsightCli::Internal
 {
 namespace
 {
+FString NormalizeChannelName(FString Name)
+{
+	Name = Name.ToLower();
+	Name.ReplaceInline(TEXT(" "), TEXT(""));
+	Name.ReplaceInline(TEXT("-"), TEXT(""));
+	Name.ReplaceInline(TEXT("_"), TEXT(""));
+	return Name;
+}
+
+bool IsChannelEnabledByName(const TSet<FString>& EnabledChannels, const FString& ChannelName)
+{
+	return EnabledChannels.Contains(NormalizeChannelName(ChannelName));
+}
+
+FString DataQualityToString(const EInsightCliCommandDataQuality DataQuality)
+{
+	switch (DataQuality)
+	{
+	case EInsightCliCommandDataQuality::TraceBacked:
+		return TEXT("trace");
+	case EInsightCliCommandDataQuality::ApproxOrTraceBacked:
+		return TEXT("approx_or_trace");
+	case EInsightCliCommandDataQuality::Approx:
+		return TEXT("approx");
+	default:
+		return TEXT("trace");
+	}
+}
+
 TArray<TSharedPtr<FJsonValue>> BuildThreadBreakdownData(const FFrameSample& Frame)
 {
 	const double DenominatorMs = FMath::Max(KINDA_SMALL_NUMBER, Frame.FrameTimeMs);
@@ -178,9 +208,10 @@ bool HandleInfoAndFramesCommands(const FInsightCliRequest& Request, const FTrace
 		const TSharedRef<FJsonObject> Data = MakeInfoSummaryData(Context, UnavailableFields);
 
 		TSharedPtr<FJsonObject> MetaObject;
+		MetaObject = MakeShared<FJsonObject>();
+		MetaObject->SetStringField(TEXT("frame_domain_default"), TEXT("game"));
 		if (UnavailableFields.Num() > 0)
 		{
-			MetaObject = MakeShared<FJsonObject>();
 			TArray<TSharedPtr<FJsonValue>> UnavailableFieldValues;
 			UnavailableFieldValues.Reserve(UnavailableFields.Num());
 			for (const FString& FieldName : UnavailableFields)
@@ -205,6 +236,113 @@ bool HandleInfoAndFramesCommands(const FInsightCliRequest& Request, const FTrace
 
 		TMap<FString, FString> Meta;
 		OutResponse = FInsightCliResponse::Ok(MakeEnvelopeWithObject(MakeInfoChannelsData(Context, Meta), Meta));
+		return true;
+	}
+
+	if (Request.Group == TEXT("info") && Request.Action == TEXT("capabilities"))
+	{
+		FInsightCliResponse UnknownOptionError;
+		if (!ValidateNoUnknownOptionsWithGlobals(Request.Args, {}, UnknownOptionError))
+		{
+			OutResponse = UnknownOptionError;
+			return true;
+		}
+
+		TMap<FString, FString> ChannelMeta;
+		const TSharedRef<FJsonObject> ChannelsData = MakeInfoChannelsData(Context, ChannelMeta);
+		TSet<FString> EnabledChannels;
+		const TArray<TSharedPtr<FJsonValue>>* ChannelItems = nullptr;
+		if (ChannelsData->TryGetArrayField(TEXT("channels"), ChannelItems) && ChannelItems != nullptr)
+		{
+			for (const TSharedPtr<FJsonValue>& ChannelValue : *ChannelItems)
+			{
+				const TSharedPtr<FJsonObject> ChannelObject = ChannelValue.IsValid() ? ChannelValue->AsObject() : nullptr;
+				if (!ChannelObject.IsValid())
+				{
+					continue;
+				}
+
+				FString ChannelName;
+				bool bEnabled = false;
+				if (!ChannelObject->TryGetStringField(TEXT("name"), ChannelName) || !ChannelObject->TryGetBoolField(TEXT("enabled"), bEnabled))
+				{
+					continue;
+				}
+
+				if (bEnabled)
+				{
+					EnabledChannels.Add(NormalizeChannelName(ChannelName));
+				}
+			}
+		}
+
+		TArray<TSharedPtr<FJsonValue>> Data;
+		int32 AvailableCount = 0;
+		int32 PartialCount = 0;
+		int32 UnavailableCount = 0;
+		EnumerateCommandCatalog([&](const FInsightCliCommandCatalogEntry& Entry)
+		{
+			TArray<FString> MissingRequiredChannels;
+			for (const FString& RequiredChannel : Entry.RequiredChannels)
+			{
+				if (!IsChannelEnabledByName(EnabledChannels, RequiredChannel))
+				{
+					MissingRequiredChannels.Add(RequiredChannel);
+				}
+			}
+
+			int32 EnabledOptionalCount = 0;
+			for (const FString& OptionalChannel : Entry.OptionalChannels)
+			{
+				if (IsChannelEnabledByName(EnabledChannels, OptionalChannel))
+				{
+					++EnabledOptionalCount;
+				}
+			}
+
+			FString Status = TEXT("available");
+			if (MissingRequiredChannels.Num() > 0)
+			{
+				Status = TEXT("unavailable");
+				++UnavailableCount;
+			}
+			else if ((Entry.OptionalChannels.Num() > 0 && EnabledOptionalCount < Entry.OptionalChannels.Num())
+				|| Entry.DataQuality != EInsightCliCommandDataQuality::TraceBacked)
+			{
+				Status = TEXT("partial");
+				++PartialCount;
+			}
+			else
+			{
+				++AvailableCount;
+			}
+
+			const TSharedRef<FJsonObject> Item = MakeShared<FJsonObject>();
+			Item->SetStringField(TEXT("command"), FString::Printf(TEXT("%s %s"), *Entry.Group, *Entry.Action));
+			Item->SetStringField(TEXT("group"), Entry.Group);
+			Item->SetStringField(TEXT("action"), Entry.Action);
+			Item->SetStringField(TEXT("status"), Status);
+			Item->SetStringField(TEXT("data_quality"), DataQualityToString(Entry.DataQuality));
+			Item->SetBoolField(TEXT("may_be_empty"), Entry.bMayBeEmpty);
+
+			TArray<TSharedPtr<FJsonValue>> MissingChannels;
+			MissingChannels.Reserve(MissingRequiredChannels.Num());
+			for (const FString& MissingChannel : MissingRequiredChannels)
+			{
+				MissingChannels.Add(MakeShared<FJsonValueString>(MissingChannel));
+			}
+			Item->SetArrayField(TEXT("missing_required_channels"), MissingChannels);
+
+			Data.Add(MakeShared<FJsonValueObject>(Item));
+		});
+
+		TMap<FString, FString> Meta;
+		Meta.Add(TEXT("command_count"), FString::FromInt(Data.Num()));
+		Meta.Add(TEXT("available_count"), FString::FromInt(AvailableCount));
+		Meta.Add(TEXT("partial_count"), FString::FromInt(PartialCount));
+		Meta.Add(TEXT("unavailable_count"), FString::FromInt(UnavailableCount));
+		Meta.Add(TEXT("data_source"), TEXT("catalog_channels"));
+		OutResponse = FInsightCliResponse::Ok(MakeEnvelopeWithArray(Data, Meta));
 		return true;
 	}
 
@@ -239,6 +377,7 @@ bool HandleInfoAndFramesCommands(const FInsightCliRequest& Request, const FTrace
 		Meta.Add(TEXT("data_source"), Context.bFrameSamplesTraceBacked ? TEXT("trace") : TEXT("unavailable"));
 		Meta.Add(TEXT("game_frame_count"), FString::FromInt(Context.TraceGameFrameCount));
 		Meta.Add(TEXT("rendering_frame_count"), FString::FromInt(Context.TraceRenderingFrameCount));
+		Meta.Add(TEXT("frame_domain_default"), TEXT("game"));
 		AppendTimeWindowMeta(TimeWindow, Meta);
 
 		OutResponse = FInsightCliResponse::Ok(MakeEnvelopeWithObject(MakeFramesSummaryData(Frames), Meta));
@@ -302,6 +441,7 @@ bool HandleInfoAndFramesCommands(const FInsightCliRequest& Request, const FTrace
 		Meta.Add(TEXT("data_source"), Context.bFrameSamplesTraceBacked ? TEXT("trace") : TEXT("unavailable"));
 		Meta.Add(TEXT("game_frame_count"), FString::FromInt(Context.TraceGameFrameCount));
 		Meta.Add(TEXT("rendering_frame_count"), FString::FromInt(Context.TraceRenderingFrameCount));
+		Meta.Add(TEXT("frame_domain_default"), TEXT("game"));
 		AppendTimeWindowMeta(TimeWindow, Meta);
 		OutResponse = FInsightCliResponse::Ok(MakeEnvelopeWithArray(Data, Meta));
 		return true;

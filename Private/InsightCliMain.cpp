@@ -6,6 +6,7 @@
 #include "RequiredProgramMainCPPInclude.h"
 
 #include "Dom/JsonObject.h"
+#include "Misc/Base64.h"
 #include "Misc/FileHelper.h"
 #include "Policies/CondensedJsonPrintPolicy.h"
 #include "Serialization/JsonReader.h"
@@ -37,6 +38,36 @@ bool IsSchemaToken(const TCHAR* Token)
 bool IsBoolOptionName(const FString& OptionName)
 {
 	return OptionName == TEXT("case-sensitive") || OptionName == TEXT("exact");
+}
+
+FString DataQualityToString(const UE::InsightCli::EInsightCliCommandDataQuality Quality)
+{
+	switch (Quality)
+	{
+	case UE::InsightCli::EInsightCliCommandDataQuality::TraceBacked:
+		return TEXT("trace");
+	case UE::InsightCli::EInsightCliCommandDataQuality::ApproxOrTraceBacked:
+		return TEXT("approx_or_trace");
+	case UE::InsightCli::EInsightCliCommandDataQuality::Approx:
+		return TEXT("approx");
+	default:
+		return TEXT("trace");
+	}
+}
+
+FString DataQualityHelpTag(const UE::InsightCli::EInsightCliCommandDataQuality Quality)
+{
+	switch (Quality)
+	{
+	case UE::InsightCli::EInsightCliCommandDataQuality::TraceBacked:
+		return TEXT("trace");
+	case UE::InsightCli::EInsightCliCommandDataQuality::Approx:
+		return TEXT("approx");
+	case UE::InsightCli::EInsightCliCommandDataQuality::ApproxOrTraceBacked:
+		return TEXT("trace/approx");
+	default:
+		return TEXT("trace");
+	}
 }
 
 TSharedRef<FJsonObject> MakeOptionSchemaObject(const FString& OptionName, bool bRequired)
@@ -79,6 +110,23 @@ TSharedRef<FJsonObject> MakeCommandSchemaEntry(const UE::InsightCli::FInsightCli
 	InputSchema->SetArrayField(TEXT("required_options"), RequiredOptions);
 	InputSchema->SetArrayField(TEXT("optional_options"), OptionalOptions);
 
+	TArray<TSharedPtr<FJsonValue>> RequiredChannels;
+	RequiredChannels.Reserve(Entry.RequiredChannels.Num());
+	for (const FString& Channel : Entry.RequiredChannels)
+	{
+		RequiredChannels.Add(MakeShared<FJsonValueString>(Channel));
+	}
+
+	TArray<TSharedPtr<FJsonValue>> OptionalChannels;
+	OptionalChannels.Reserve(Entry.OptionalChannels.Num());
+	for (const FString& Channel : Entry.OptionalChannels)
+	{
+		OptionalChannels.Add(MakeShared<FJsonValueString>(Channel));
+	}
+
+	InputSchema->SetArrayField(TEXT("required_channels"), RequiredChannels);
+	InputSchema->SetArrayField(TEXT("optional_channels"), OptionalChannels);
+
 	TArray<TSharedPtr<FJsonValue>> OptionSchemas;
 	OptionSchemas.Reserve(Entry.RequiredOptions.Num() + Entry.OptionalOptions.Num());
 	for (const FString& Option : Entry.RequiredOptions)
@@ -96,6 +144,8 @@ TSharedRef<FJsonObject> MakeCommandSchemaEntry(const UE::InsightCli::FInsightCli
 	OutputSchema->SetStringField(TEXT("envelope"), TEXT("{ \"data\": object|array, \"meta\"?: object }"));
 	OutputSchema->SetStringField(TEXT("data"), TEXT("command-specific payload"));
 	OutputSchema->SetStringField(TEXT("meta"), TEXT("command-specific metadata"));
+	OutputSchema->SetStringField(TEXT("data_quality"), DataQualityToString(Entry.DataQuality));
+	OutputSchema->SetBoolField(TEXT("may_be_empty"), Entry.bMayBeEmpty);
 
 	Item->SetObjectField(TEXT("input_schema"), InputSchema);
 	Item->SetObjectField(TEXT("output_schema_summary"), OutputSchema);
@@ -214,6 +264,26 @@ UE::InsightCli::FInsightCliResponse MakeTopLevelHelpResponse()
 
 		Item->SetArrayField(TEXT("required_options"), RequiredOptions);
 		Item->SetArrayField(TEXT("optional_options"), OptionalOptions);
+
+		TArray<TSharedPtr<FJsonValue>> RequiredChannels;
+		RequiredChannels.Reserve(Entry.RequiredChannels.Num());
+		for (const FString& Channel : Entry.RequiredChannels)
+		{
+			RequiredChannels.Add(MakeShared<FJsonValueString>(Channel));
+		}
+
+		TArray<TSharedPtr<FJsonValue>> OptionalChannels;
+		OptionalChannels.Reserve(Entry.OptionalChannels.Num());
+		for (const FString& Channel : Entry.OptionalChannels)
+		{
+			OptionalChannels.Add(MakeShared<FJsonValueString>(Channel));
+		}
+
+		Item->SetArrayField(TEXT("required_channels"), RequiredChannels);
+		Item->SetArrayField(TEXT("optional_channels"), OptionalChannels);
+		Item->SetStringField(TEXT("data_quality"), DataQualityToString(Entry.DataQuality));
+		Item->SetStringField(TEXT("quality_tag"), DataQualityHelpTag(Entry.DataQuality));
+		Item->SetBoolField(TEXT("may_be_empty"), Entry.bMayBeEmpty);
 		Commands.Add(MakeShared<FJsonValueObject>(Item));
 		++CommandCount;
 	});
@@ -475,8 +545,55 @@ FString MakeCondensedJsonLine(const FString& Envelope)
 	return Out;
 }
 
-bool ApplyGlobalOutputOptionsToStdOut(FString& InOutStdOut, const UE::InsightCli::Internal::FGlobalOutputOptions& Options)
+FString EncodeCursorOffset(const int32 Offset)
 {
+	const FString Payload = FString::Printf(TEXT("v1:%d"), Offset);
+	FTCHARToUTF8 Utf8Payload(*Payload);
+	return FBase64::Encode(reinterpret_cast<const uint8*>(Utf8Payload.Get()), Utf8Payload.Length());
+}
+
+bool TryDecodeCursorOffset(const FString& Cursor, int32& OutOffset)
+{
+	OutOffset = 0;
+	TArray<uint8> Bytes;
+	if (!FBase64::Decode(Cursor, Bytes))
+	{
+		return false;
+	}
+
+	Bytes.Add(0);
+	const FString Decoded = UTF8_TO_TCHAR(reinterpret_cast<const ANSICHAR*>(Bytes.GetData()));
+
+	FString Version;
+	FString OffsetText;
+	if (!Decoded.Split(TEXT(":"), &Version, &OffsetText) || Version != TEXT("v1"))
+	{
+		return false;
+	}
+
+	if (OffsetText.IsEmpty())
+	{
+		return false;
+	}
+
+	TCHAR* End = nullptr;
+	const int64 Parsed = FCString::Strtoi64(*OffsetText, &End, 10);
+	if (End == nullptr || *End != 0 || Parsed < 0 || Parsed > MAX_int32)
+	{
+		return false;
+	}
+
+	OutOffset = static_cast<int32>(Parsed);
+	return true;
+}
+
+bool ApplyGlobalOutputOptionsToStdOut(
+	FString& InOutStdOut,
+	const UE::InsightCli::Internal::FGlobalOutputOptions& Options,
+	UE::InsightCli::FInsightCliResponse& OutError)
+{
+	OutError = UE::InsightCli::FInsightCliResponse();
+
 	if (!Options.HasAny() || InOutStdOut.IsEmpty())
 	{
 		return true;
@@ -587,6 +704,50 @@ bool ApplyGlobalOutputOptionsToStdOut(FString& InOutStdOut, const UE::InsightCli
 	}
 
 	DataValuePtr = Root->Values.Find(TEXT("data"));
+	if (Options.PageSize.IsSet() && DataValuePtr != nullptr && (*DataValuePtr)->Type == EJson::Array)
+	{
+		const TArray<TSharedPtr<FJsonValue>> DataArray = (*DataValuePtr)->AsArray();
+		const int32 RowCountTotal = DataArray.Num();
+		int32 Offset = 0;
+
+		if (Options.Cursor.IsSet() && !TryDecodeCursorOffset(Options.Cursor.GetValue(), Offset))
+		{
+			OutError = UE::InsightCli::Internal::MakeOptionError(TEXT("cursor is invalid or uses an unsupported schema version."));
+			return false;
+		}
+
+		if (Offset < 0 || Offset > RowCountTotal)
+		{
+			OutError = UE::InsightCli::Internal::MakeOptionError(TEXT("cursor offset is out of bounds for this result set."));
+			return false;
+		}
+
+		const int32 PageSize = Options.PageSize.GetValue();
+		const int32 EndOffset = FMath::Min(Offset + PageSize, RowCountTotal);
+
+		TArray<TSharedPtr<FJsonValue>> PageRows;
+		PageRows.Reserve(FMath::Max(0, EndOffset - Offset));
+		for (int32 RowIndex = Offset; RowIndex < EndOffset; ++RowIndex)
+		{
+			PageRows.Add(DataArray[RowIndex]);
+		}
+
+		Root->SetArrayField(TEXT("data"), PageRows);
+		MetaObject->SetStringField(TEXT("cursor_schema"), TEXT("v1"));
+		MetaObject->SetNumberField(TEXT("row_count_total"), RowCountTotal);
+		MetaObject->SetNumberField(TEXT("row_count_returned"), PageRows.Num());
+
+		if (EndOffset < RowCountTotal)
+		{
+			MetaObject->SetStringField(TEXT("next_cursor"), EncodeCursorOffset(EndOffset));
+		}
+		else
+		{
+			MetaObject->SetField(TEXT("next_cursor"), MakeShared<FJsonValueNull>());
+		}
+	}
+
+	DataValuePtr = Root->Values.Find(TEXT("data"));
 	if (Options.MaxRows.IsSet() && DataValuePtr != nullptr && (*DataValuePtr)->Type == EJson::Array)
 	{
 		const TArray<TSharedPtr<FJsonValue>> DataArray = (*DataValuePtr)->AsArray();
@@ -664,7 +825,11 @@ UE::InsightCli::FInsightCliResponse RunBatchProgram(int32 ArgC, TCHAR* ArgV[])
 		UE::InsightCli::FInsightCliResponse CommandResponse = UE::InsightCli::ExecuteCommandWithSharedContext(Request, SharedContext);
 		if (CommandResponse.ExitCode == 0)
 		{
-			ApplyGlobalOutputOptionsToStdOut(CommandResponse.StdOut, OutputOptions);
+			UE::InsightCli::FInsightCliResponse OutputTransformError;
+			if (!ApplyGlobalOutputOptionsToStdOut(CommandResponse.StdOut, OutputOptions, OutputTransformError) && OutputTransformError.ExitCode != 0)
+			{
+				CommandResponse = OutputTransformError;
+			}
 		}
 		MaxExitCode = FMath::Max(MaxExitCode, CommandResponse.ExitCode);
 
@@ -712,7 +877,11 @@ UE::InsightCli::FInsightCliResponse RunProgram(int32 ArgC, TCHAR* ArgV[])
 	UE::InsightCli::FInsightCliResponse Response = UE::InsightCli::ExecuteCommand(Request);
 	if (Response.ExitCode == 0)
 	{
-		ApplyGlobalOutputOptionsToStdOut(Response.StdOut, OutputOptions);
+		UE::InsightCli::FInsightCliResponse OutputTransformError;
+		if (!ApplyGlobalOutputOptionsToStdOut(Response.StdOut, OutputOptions, OutputTransformError) && OutputTransformError.ExitCode != 0)
+		{
+			return OutputTransformError;
+		}
 	}
 	return Response;
 }

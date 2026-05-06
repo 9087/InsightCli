@@ -9,9 +9,70 @@
 
 namespace UE::InsightCli::Internal
 {
+namespace
+{
+int32 ResolveDomainFrameIndex(const FFrameSample& Frame, const EFrameDomain FrameDomain)
+{
+	if (FrameDomain == EFrameDomain::Rendering)
+	{
+		return Frame.RenderingFrameIndex;
+	}
+
+	return Frame.GameFrameIndex;
+}
+
+FString ClassifyHeuristicWaitType(const FString& ThreadName, const double WaitMs)
+{
+	const FString NormalizedThreadName = ThreadName.ToLower();
+	if (NormalizedThreadName.Contains(TEXT("rhi")) || NormalizedThreadName.Contains(TEXT("render")) || NormalizedThreadName.Contains(TEXT("gpu")))
+	{
+		return TEXT("fence");
+	}
+	if (NormalizedThreadName.Contains(TEXT("io")) || NormalizedThreadName.Contains(TEXT("file")))
+	{
+		return TEXT("io");
+	}
+	if (NormalizedThreadName.Contains(TEXT("task")) || NormalizedThreadName.Contains(TEXT("worker")))
+	{
+		return TEXT("task_dep");
+	}
+	if (WaitMs >= 1.0)
+	{
+		return TEXT("event");
+	}
+
+	return TEXT("sleep");
+}
+
+void ResolveFrameIndicesForTimestamp(
+	const TArray<FFrameSample>& Frames,
+	const double TimestampMs,
+	int32& OutGameFrameIndex,
+	int32& OutRenderingFrameIndex,
+	int32& OutSelectedFrameIndex,
+	const EFrameDomain FrameDomain)
+{
+	OutGameFrameIndex = -1;
+	OutRenderingFrameIndex = -1;
+	OutSelectedFrameIndex = -1;
+
+	for (const FFrameSample& Frame : Frames)
+	{
+		if (Frame.FrameStartMs <= TimestampMs && TimestampMs <= Frame.FrameEndMs)
+		{
+			OutGameFrameIndex = Frame.GameFrameIndex;
+			OutRenderingFrameIndex = Frame.RenderingFrameIndex;
+			OutSelectedFrameIndex = ResolveDomainFrameIndex(Frame, FrameDomain);
+			return;
+		}
+	}
+}
+}
+
 bool BuildThreadWaitSamplesTrace(
 	const FTraceContext& Context,
 	TOptional<int32> FrameIndexFilter,
+	EFrameDomain FrameDomain,
 	TArray<FThreadWaitSample>& OutSamples,
 	FString& OutFailureStage,
 	FString& OutFailureReason,
@@ -28,9 +89,9 @@ bool BuildThreadWaitSamplesTrace(
 	if (FrameIndexFilter.IsSet())
 	{
 		Frames = BuildFrameSamples(Context);
-		const FFrameSample* FoundFrame = Frames.FindByPredicate([&FrameIndexFilter](const FFrameSample& Frame)
+		const FFrameSample* FoundFrame = Frames.FindByPredicate([&FrameIndexFilter, FrameDomain](const FFrameSample& Frame)
 		{
-			return Frame.FrameIndex == FrameIndexFilter.GetValue();
+			return ResolveDomainFrameIndex(Frame, FrameDomain) == FrameIndexFilter.GetValue();
 		});
 
 		if (FoundFrame == nullptr)
@@ -52,18 +113,6 @@ bool BuildThreadWaitSamplesTrace(
 	{
 		return false;
 	}
-
-	const auto GetFrameIndexForTimestampMs = [&Frames](const double TimestampMs) -> int32
-	{
-		for (const FFrameSample& Frame : Frames)
-		{
-			if (Frame.FrameStartMs <= TimestampMs && TimestampMs <= Frame.FrameEndMs)
-			{
-				return Frame.FrameIndex;
-			}
-		}
-		return -1;
-	};
 
 	const double QueryStartSec = IntervalStartSec.IsSet() ? IntervalStartSec.GetValue() : 0.0;
 
@@ -124,15 +173,32 @@ bool BuildThreadWaitSamplesTrace(
 				}
 
 				FThreadWaitSample Wait;
-				Wait.FrameIndex = FrameIndexFilter.IsSet() ? FrameIndexFilter.GetValue() : GetFrameIndexForTimestampMs(GapStartSec * 1000.0);
+				if (FrameIndexFilter.IsSet())
+				{
+					Wait.FrameIndex = FrameIndexFilter.GetValue();
+					Wait.GameFrameIndex = (FrameDomain == EFrameDomain::Game) ? FrameIndexFilter.GetValue() : -1;
+					Wait.RenderingFrameIndex = (FrameDomain == EFrameDomain::Rendering) ? FrameIndexFilter.GetValue() : -1;
+				}
+				else
+				{
+					ResolveFrameIndicesForTimestamp(
+						Frames,
+						GapStartSec * 1000.0,
+						Wait.GameFrameIndex,
+						Wait.RenderingFrameIndex,
+						Wait.FrameIndex,
+						FrameDomain);
+				}
 				Wait.ThreadId = static_cast<int32>(ThreadInfo.Id);
 				Wait.ThreadName = ThreadInfo.Name != nullptr ? ThreadInfo.Name : FString();
-				Wait.WaitType = TEXT("Scheduler");
 				Wait.WaitTypeFromTrace = TEXT("Scheduler");
 				Wait.WaitObject = TEXT("ContextSwitchGap");
+				Wait.WaitObjectAddress = TEXT("unavailable");
+				Wait.WaitSourceProvider = TEXT("ContextSwitchesProvider");
 				Wait.BeginMs = GapStartSec * 1000.0;
 				Wait.EndMs = GapEndSec * 1000.0;
 				Wait.WaitMs = Wait.EndMs - Wait.BeginMs;
+				Wait.WaitType = ClassifyHeuristicWaitType(Wait.ThreadName, Wait.WaitMs);
 
 				double BestOverlapSec = 0.0;
 				int32 BestBlockerThreadId = -1;
@@ -234,11 +300,15 @@ TSharedRef<FJsonObject> MakeThreadWaitObject(const FThreadWaitSample& Wait)
 {
 	const TSharedRef<FJsonObject> Item = MakeShared<FJsonObject>();
 	Item->SetNumberField(TEXT("frame_index"), Wait.FrameIndex);
+	Item->SetNumberField(TEXT("game_frame_index"), Wait.GameFrameIndex);
+	Item->SetNumberField(TEXT("rendering_frame_index"), Wait.RenderingFrameIndex);
 	Item->SetNumberField(TEXT("thread_id"), Wait.ThreadId);
 	Item->SetStringField(TEXT("thread_name"), Wait.ThreadName);
 	Item->SetStringField(TEXT("wait_type"), Wait.WaitType);
 	Item->SetStringField(TEXT("wait_type_from_trace"), Wait.WaitTypeFromTrace);
 	Item->SetStringField(TEXT("wait_object"), Wait.WaitObject);
+	Item->SetStringField(TEXT("wait_object_address"), Wait.WaitObjectAddress);
+	Item->SetStringField(TEXT("wait_source_provider"), Wait.WaitSourceProvider);
 	Item->SetNumberField(TEXT("wait_ms"), Wait.WaitMs);
 	Item->SetNumberField(TEXT("blocker_overlap_ratio"), Wait.BlockerOverlapRatio);
 	Item->SetNumberField(TEXT("blocker_confidence"), Wait.BlockerConfidence);

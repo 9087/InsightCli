@@ -6,6 +6,40 @@
 
 namespace UE::InsightCli
 {
+enum class EInsightCliTraceUnavailableSubcode : uint8
+{
+	ChannelDisabled,
+	ProviderUnavailable,
+	FrameRangeOutOfBounds,
+	EntityNotFound,
+	AnalysisTimeout,
+	TraceCorrupted,
+	ThreadTaskMissing,
+	IncompatibleTraceVersion,
+	Unknown,
+};
+
+enum class EInsightCliFailureStage : uint8
+{
+	Unknown,
+	ModuleLoad,
+	AnalysisService,
+	StartAnalysis,
+	AnalysisSession,
+	FrameProvider,
+	ThreadProvider,
+	TimingProvider,
+	TasksProvider,
+	ContextSwitchesProvider,
+	Aggregation,
+	ThreadLookup,
+	CommandDispatch,
+};
+
+const TCHAR* LexToString(EInsightCliTraceUnavailableSubcode Subcode);
+const TCHAR* LexToString(EInsightCliFailureStage Stage);
+EInsightCliFailureStage ParseFailureStage(const FString& StageText);
+
 struct FInsightCliRequest
 {
 	FString TracePath;

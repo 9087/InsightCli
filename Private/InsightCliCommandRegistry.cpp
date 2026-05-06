@@ -18,12 +18,17 @@ struct FCommandCatalogEntry
 	FGroupHandlerFn Handler;
 	std::initializer_list<const TCHAR*> RequiredOptions;
 	std::initializer_list<const TCHAR*> OptionalOptions;
+	std::initializer_list<const TCHAR*> RequiredChannels;
+	std::initializer_list<const TCHAR*> OptionalChannels;
+	EInsightCliCommandDataQuality DataQuality = EInsightCliCommandDataQuality::TraceBacked;
+	bool bMayBeEmpty = true;
 };
 
 const FCommandCatalogEntry CommandCatalog[] =
 {
-	{ TEXT("info"), TEXT("summary"), &HandleInfoAndFramesCommands, {}, {} },
-	{ TEXT("info"), TEXT("channels"), &HandleInfoAndFramesCommands, {}, {} },
+	{ TEXT("info"), TEXT("summary"), &HandleInfoAndFramesCommands, {}, {}, {}, {}, EInsightCliCommandDataQuality::TraceBacked, false },
+	{ TEXT("info"), TEXT("channels"), &HandleInfoAndFramesCommands, {}, {}, {}, {}, EInsightCliCommandDataQuality::TraceBacked, false },
+	{ TEXT("info"), TEXT("capabilities"), &HandleInfoAndFramesCommands, {}, {}, {}, {}, EInsightCliCommandDataQuality::TraceBacked, false },
 	{ TEXT("frames"), TEXT("summary"), &HandleInfoAndFramesCommands, {}, { TEXT("time-start"), TEXT("time-end"), TEXT("frame-range") } },
 	{ TEXT("frames"), TEXT("slowest"), &HandleInfoAndFramesCommands, {}, { TEXT("limit"), TEXT("time-start"), TEXT("time-end"), TEXT("frame-range") } },
 	{ TEXT("frames"), TEXT("detail"), &HandleInfoAndFramesCommands, { TEXT("frame-index") }, { TEXT("breakdown") } },
@@ -36,8 +41,8 @@ const FCommandCatalogEntry CommandCatalog[] =
 	{ TEXT("gpu"), TEXT("pass-detail"), &HandlePerformanceCommands, { TEXT("frame-index"), TEXT("pass") }, {} },
 	{ TEXT("rhi"), TEXT("summary"), &HandlePerformanceCommands, { TEXT("frame-index") }, {} },
 	{ TEXT("rhi"), TEXT("drawcalls"), &HandlePerformanceCommands, {}, { TEXT("limit"), TEXT("frame-index") } },
-	{ TEXT("rhi"), TEXT("top-materials"), &HandlePerformanceCommands, {}, { TEXT("limit"), TEXT("frame-index") } },
-	{ TEXT("rhi"), TEXT("top-meshes"), &HandlePerformanceCommands, {}, { TEXT("limit"), TEXT("frame-index") } },
+	{ TEXT("rhi"), TEXT("top-materials"), &HandlePerformanceCommands, {}, { TEXT("limit"), TEXT("frame-index") }, { TEXT("RHIDraws") }, { TEXT("RDG") }, EInsightCliCommandDataQuality::TraceBacked, true },
+	{ TEXT("rhi"), TEXT("top-meshes"), &HandlePerformanceCommands, {}, { TEXT("limit"), TEXT("frame-index") }, { TEXT("RHIDraws") }, { TEXT("RDG") }, EInsightCliCommandDataQuality::TraceBacked, true },
 	{ TEXT("anim"), TEXT("top-actors"), &HandlePerformanceCommands, {}, { TEXT("limit") } },
 	{ TEXT("anim"), TEXT("graph"), &HandlePerformanceCommands, { TEXT("actor") }, {} },
 	{ TEXT("anim"), TEXT("skinning"), &HandlePerformanceCommands, {}, { TEXT("limit") } },
@@ -49,10 +54,10 @@ const FCommandCatalogEntry CommandCatalog[] =
 	{ TEXT("slate"), TEXT("top-widgets"), &HandlePerformanceCommands, {}, { TEXT("by"), TEXT("limit") } },
 	{ TEXT("slate"), TEXT("paint-cost"), &HandlePerformanceCommands, {}, { TEXT("frame-index") } },
 	{ TEXT("slate"), TEXT("invalidation-rate"), &HandlePerformanceCommands, {}, { TEXT("time-start"), TEXT("time-end"), TEXT("frame-range") } },
-	{ TEXT("threads"), TEXT("waits"), &HandlePerformanceCommands, {}, { TEXT("frame-index"), TEXT("limit") } },
-	{ TEXT("threads"), TEXT("wait-chain"), &HandlePerformanceCommands, {}, { TEXT("thread"), TEXT("depth"), TEXT("time-start"), TEXT("time-end"), TEXT("frame-range") } },
-	{ TEXT("tasks"), TEXT("top"), &HandlePerformanceCommands, {}, { TEXT("frame-index"), TEXT("limit") } },
-	{ TEXT("tasks"), TEXT("critical-path"), &HandlePerformanceCommands, {}, { TEXT("frame-index"), TEXT("top") } },
+	{ TEXT("threads"), TEXT("waits"), &HandlePerformanceCommands, {}, { TEXT("frame-index"), TEXT("limit"), TEXT("frame-domain") }, {}, { TEXT("WaitTrace"), TEXT("Mutex"), TEXT("IoStore"), TEXT("RHIFence") }, EInsightCliCommandDataQuality::ApproxOrTraceBacked, true },
+	{ TEXT("threads"), TEXT("wait-chain"), &HandlePerformanceCommands, {}, { TEXT("thread"), TEXT("depth"), TEXT("time-start"), TEXT("time-end"), TEXT("frame-range"), TEXT("frame-domain") }, {}, { TEXT("WaitTrace"), TEXT("Mutex"), TEXT("IoStore"), TEXT("RHIFence") }, EInsightCliCommandDataQuality::ApproxOrTraceBacked, true },
+	{ TEXT("tasks"), TEXT("top"), &HandlePerformanceCommands, {}, { TEXT("frame-index"), TEXT("limit"), TEXT("frame-domain") }, { TEXT("Task"), TEXT("Tasks"), TEXT("TaskGraph") }, {}, EInsightCliCommandDataQuality::TraceBacked, true },
+	{ TEXT("tasks"), TEXT("critical-path"), &HandlePerformanceCommands, {}, { TEXT("frame-index"), TEXT("top"), TEXT("frame-domain") }, { TEXT("Task"), TEXT("Tasks"), TEXT("TaskGraph") }, {}, EInsightCliCommandDataQuality::TraceBacked, true },
 	{ TEXT("net"), TEXT("summary"), &HandleDataCommands, {}, {} },
 	{ TEXT("net"), TEXT("top-actors"), &HandleDataCommands, {}, { TEXT("limit") } },
 	{ TEXT("net"), TEXT("top-rpcs"), &HandleDataCommands, {}, { TEXT("limit") } },
@@ -159,6 +164,16 @@ void EnumerateCommandCatalog(TFunctionRef<void(const FInsightCliCommandCatalogEn
 		{
 			PublicEntry.OptionalOptions.Add(Option);
 		}
+		for (const TCHAR* Channel : Entry.RequiredChannels)
+		{
+			PublicEntry.RequiredChannels.Add(Channel);
+		}
+		for (const TCHAR* Channel : Entry.OptionalChannels)
+		{
+			PublicEntry.OptionalChannels.Add(Channel);
+		}
+		PublicEntry.DataQuality = Entry.DataQuality;
+		PublicEntry.bMayBeEmpty = Entry.bMayBeEmpty;
 
 		Visitor(PublicEntry);
 	}

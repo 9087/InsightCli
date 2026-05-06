@@ -9,6 +9,18 @@
 
 namespace UE::InsightCli::Internal
 {
+namespace
+{
+FString NormalizeChannelName(FString Name)
+{
+	Name = Name.ToLower();
+	Name.ReplaceInline(TEXT(" "), TEXT(""));
+	Name.ReplaceInline(TEXT("-"), TEXT(""));
+	Name.ReplaceInline(TEXT("_"), TEXT(""));
+	return Name;
+}
+}
+
 void ApplyTimeWindowFilter(TArray<FFrameSample>& Frames, const FResolvedTimeWindowMs& TimeWindow)
 {
 	if (!TimeWindow.IsSet())
@@ -125,6 +137,8 @@ TSharedRef<FJsonObject> MakeInfoChannelsData(const FTraceContext& Context, TMap<
 {
 	const TSharedRef<FJsonObject> Data = MakeShared<FJsonObject>();
 	TArray<TSharedPtr<FJsonValue>> ChannelsArray;
+	TSet<FString> ExistingChannelKeys;
+	TSet<FString> EnabledChannelKeys;
 
 	OutMeta.Add(TEXT("data_source"), TEXT("unavailable"));
 	OutMeta.Add(TEXT("channel_count"), TEXT("0"));
@@ -153,9 +167,17 @@ TSharedRef<FJsonObject> MakeInfoChannelsData(const FTraceContext& Context, TMap<
 			ChannelsArray.Reserve(Channels.Num());
 			for (const TraceServices::FChannelEntry& Channel : Channels)
 			{
+				const FString ChannelName = Channel.Name;
+				const FString ChannelKey = NormalizeChannelName(ChannelName);
+				ExistingChannelKeys.Add(ChannelKey);
+				if (Channel.bIsEnabled)
+				{
+					EnabledChannelKeys.Add(ChannelKey);
+				}
+
 				const TSharedRef<FJsonObject> Item = MakeShared<FJsonObject>();
 				Item->SetNumberField(TEXT("channel_id"), Channel.Id);
-				Item->SetStringField(TEXT("name"), Channel.Name);
+				Item->SetStringField(TEXT("name"), ChannelName);
 				Item->SetBoolField(TEXT("enabled"), Channel.bIsEnabled);
 				Item->SetBoolField(TEXT("read_only"), Channel.bReadOnly);
 				Item->SetStringField(TEXT("provider"), TEXT("ChannelProvider"));
@@ -168,6 +190,36 @@ TSharedRef<FJsonObject> MakeInfoChannelsData(const FTraceContext& Context, TMap<
 		}
 	}
 
+	const TArray<FString> CapabilityChannels =
+	{
+		TEXT("WaitTrace"),
+		TEXT("Mutex"),
+		TEXT("IoStore"),
+		TEXT("RHIFence"),
+		TEXT("RHIDraws"),
+		TEXT("RDG")
+	};
+
+	for (const FString& CapabilityChannel : CapabilityChannels)
+	{
+		if (ExistingChannelKeys.Contains(NormalizeChannelName(CapabilityChannel)))
+		{
+			continue;
+		}
+
+		const TSharedRef<FJsonObject> Item = MakeShared<FJsonObject>();
+		Item->SetNumberField(TEXT("channel_id"), -1);
+		Item->SetStringField(TEXT("name"), CapabilityChannel);
+		Item->SetBoolField(TEXT("enabled"), false);
+		Item->SetBoolField(TEXT("read_only"), true);
+		Item->SetStringField(TEXT("provider"), TEXT("ChannelProvider(synthetic)"));
+		Item->SetStringField(TEXT("event_count"), TEXT("unavailable"));
+		Item->SetStringField(TEXT("event_count_reason"), TEXT("channel_not_present_in_trace"));
+		Item->SetStringField(TEXT("first_ts"), TEXT("unavailable"));
+		Item->SetStringField(TEXT("last_ts"), TEXT("unavailable"));
+		ChannelsArray.Add(MakeShared<FJsonValueObject>(Item));
+	}
+
 	if (!bHasChannelProvider)
 	{
 		OutMeta.Add(TEXT("channel_provider_reason"), TEXT("channel_provider_not_available"));
@@ -177,6 +229,16 @@ TSharedRef<FJsonObject> MakeInfoChannelsData(const FTraceContext& Context, TMap<
 
 	OutMeta.Add(TEXT("data_source"), TEXT("trace"));
 	OutMeta.Add(TEXT("channel_count"), FString::FromInt(ChannelsArray.Num()));
+	if (EnabledChannelKeys.Num() > 0)
+	{
+		TArray<FString> Keys = EnabledChannelKeys.Array();
+		Keys.Sort();
+		OutMeta.Add(TEXT("enabled_channel_keys"), FString::Join(Keys, TEXT(",")));
+	}
+	else
+	{
+		OutMeta.Add(TEXT("enabled_channel_keys"), TEXT(""));
+	}
 	OutMeta.Add(TEXT("channel_timestamp"), ChannelTimeStamp.ToIso8601());
 	Data->SetArrayField(TEXT("channels"), ChannelsArray);
 	return Data;

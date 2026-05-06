@@ -71,7 +71,14 @@ bool HandleThreadsCommands(const FInsightCliRequest& Request, const FTraceContex
 	if (Request.Group == TEXT("threads") && Request.Action == TEXT("waits"))
 	{
 		FInsightCliResponse UnknownOptionError;
-		if (!ValidateNoUnknownOptionsWithGlobals(Request.Args, { TEXT("limit"), TEXT("frame-index") }, UnknownOptionError))
+		if (!ValidateNoUnknownOptionsWithGlobals(Request.Args, { TEXT("limit"), TEXT("frame-index"), TEXT("frame-domain") }, UnknownOptionError))
+		{
+			OutResponse = UnknownOptionError;
+			return true;
+		}
+
+		EFrameDomain FrameDomain = EFrameDomain::Game;
+		if (!TryResolveFrameDomain(Request.Args, FrameDomain, UnknownOptionError))
 		{
 			OutResponse = UnknownOptionError;
 			return true;
@@ -91,7 +98,7 @@ bool HandleThreadsCommands(const FInsightCliRequest& Request, const FTraceContex
 		FString FailureStage;
 		FString FailureReason;
 		bool bFrameFound = true;
-		if (!BuildThreadWaitSamplesTrace(Context, bHasFrameIndex ? TOptional<int32>(FrameIndexFilter) : TOptional<int32>(), Waits, FailureStage, FailureReason, bFrameFound))
+		if (!BuildThreadWaitSamplesTrace(Context, bHasFrameIndex ? TOptional<int32>(FrameIndexFilter) : TOptional<int32>(), FrameDomain, Waits, FailureStage, FailureReason, bFrameFound))
 		{
 			TMap<FString, FString> ExtraDetails;
 			if (bHasFrameIndex)
@@ -131,6 +138,9 @@ bool HandleThreadsCommands(const FInsightCliRequest& Request, const FTraceContex
 		{
 			Meta.Add(TEXT("frame_index"), FString::FromInt(FrameIndexFilter));
 		}
+		Meta.Add(TEXT("frame_domain"), FrameDomain == EFrameDomain::Rendering ? TEXT("rendering") : TEXT("game"));
+		Meta.Add(TEXT("frame_domain_default"), TEXT("game"));
+		Meta.Add(TEXT("wait_source_provider"), TEXT("ContextSwitchesProvider"));
 		Meta.Add(TEXT("data_source"), TEXT("context_switch_heuristic"));
 		OutResponse = FInsightCliResponse::Ok(MakeEnvelopeWithArray(Data, Meta));
 		return true;
@@ -139,7 +149,14 @@ bool HandleThreadsCommands(const FInsightCliRequest& Request, const FTraceContex
 	if (Request.Group == TEXT("threads") && Request.Action == TEXT("wait-chain"))
 	{
 		FInsightCliResponse UnknownOptionError;
-		if (!ValidateNoUnknownOptionsWithGlobals(Request.Args, { TEXT("thread"), TEXT("depth"), TEXT("max-chain-depth"), TEXT("time-start"), TEXT("time-end") }, UnknownOptionError))
+		if (!ValidateNoUnknownOptionsWithGlobals(Request.Args, { TEXT("thread"), TEXT("depth"), TEXT("max-chain-depth"), TEXT("time-start"), TEXT("time-end"), TEXT("frame-range"), TEXT("frame-domain") }, UnknownOptionError))
+		{
+			OutResponse = UnknownOptionError;
+			return true;
+		}
+
+		EFrameDomain FrameDomain = EFrameDomain::Game;
+		if (!TryResolveFrameDomain(Request.Args, FrameDomain, UnknownOptionError))
 		{
 			OutResponse = UnknownOptionError;
 			return true;
@@ -195,7 +212,7 @@ bool HandleThreadsCommands(const FInsightCliRequest& Request, const FTraceContex
 		FString FailureStage;
 		FString FailureReason;
 		bool bFrameFound = true;
-		if (!BuildThreadWaitSamplesTrace(Context, {}, Waits, FailureStage, FailureReason, bFrameFound))
+		if (!BuildThreadWaitSamplesTrace(Context, {}, FrameDomain, Waits, FailureStage, FailureReason, bFrameFound))
 		{
 			OutResponse = MakeTraceUnavailableError(
 				Context,
@@ -332,6 +349,9 @@ bool HandleThreadsCommands(const FInsightCliRequest& Request, const FTraceContex
 		Meta.Add(TEXT("thread_resolved"), NormalizedThreadName);
 		Meta.Add(TEXT("depth"), FString::FromInt(MaxChainDepth));
 		Meta.Add(TEXT("max_chain_depth_used"), FString::FromInt(MaxChainDepth));
+		Meta.Add(TEXT("frame_domain"), FrameDomain == EFrameDomain::Rendering ? TEXT("rendering") : TEXT("game"));
+		Meta.Add(TEXT("frame_domain_default"), TEXT("game"));
+		Meta.Add(TEXT("wait_source_provider"), TEXT("ContextSwitchesProvider"));
 		Meta.Add(TEXT("data_source"), TEXT("context_switch_heuristic"));
 		AppendTimeWindowMeta(TimeWindow, Meta);
 		OutResponse = FInsightCliResponse::Ok(MakeEnvelopeWithArray(Data, Meta));

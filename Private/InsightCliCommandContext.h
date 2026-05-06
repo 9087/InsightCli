@@ -16,6 +16,12 @@ class IAnalysisSession;
 
 namespace UE::InsightCli::Internal
 {
+enum class EFrameDomain : uint8
+{
+	Game,
+	Rendering,
+};
+
 struct FFrameSample
 {
 	int32 FrameIndex = 0;
@@ -88,11 +94,15 @@ struct FGpuScopeSample
 struct FThreadWaitSample
 {
 	int32 FrameIndex = 0;
+	int32 GameFrameIndex = -1;
+	int32 RenderingFrameIndex = -1;
 	int32 ThreadId = -1;
 	FString ThreadName;
 	FString WaitType;
 	FString WaitTypeFromTrace;
 	FString WaitObject;
+	FString WaitObjectAddress;
+	FString WaitSourceProvider;
 	double WaitMs = 0.0;
 	double BlockerOverlapRatio = 0.0;
 	double BlockerConfidence = 0.0;
@@ -112,6 +122,8 @@ struct FTaskSample
 {
 	int32 TaskId = -1;
 	int32 FrameIndex = 0;
+	int32 GameFrameIndex = -1;
+	int32 RenderingFrameIndex = -1;
 	FString TaskName;
 	FString QueueName;
 	TArray<int32> DependencyTaskIds;
@@ -201,10 +213,12 @@ struct FGlobalOutputOptions
 {
 	TArray<FString> Fields;
 	TOptional<int32> MaxRows;
+	TOptional<FString> Cursor;
+	TOptional<int32> PageSize;
 
 	bool HasAny() const
 	{
-		return Fields.Num() > 0 || MaxRows.IsSet();
+		return Fields.Num() > 0 || MaxRows.IsSet() || Cursor.IsSet() || PageSize.IsSet();
 	}
 };
 
@@ -216,6 +230,7 @@ bool HasOption(const TArray<FString>& Args, const TCHAR* LongName);
 bool TryExtractGlobalOutputOptions(TArray<FString>& InOutArgs, FGlobalOutputOptions& OutOptions, FInsightCliResponse& OutError);
 bool ValidateNoUnknownOptionsWithGlobals(const TArray<FString>& Args, const TArray<FString>& CommandOptionNames, FInsightCliResponse& OutError);
 bool TryGetLimitAndOptionalFrameIndexFilter(const TArray<FString>& Args, int32& OutLimit, int32& OutFrameIndexFilter, bool& bOutHasFrameIndex, FInsightCliResponse& OutError);
+bool TryResolveFrameDomain(const TArray<FString>& Args, EFrameDomain& OutDomain, FInsightCliResponse& OutError);
 bool TryGetTimeWindowMs(const TArray<FString>& Args, FTimeWindowMs& OutWindow, FInsightCliResponse& OutError);
 bool TryResolveTimeWindowMs(const FTraceContext& Context, const TArray<FString>& Args, bool bAllowFrameRange, FResolvedTimeWindowMs& OutWindow, FInsightCliResponse& OutError);
 void AppendTimeWindowMeta(const FResolvedTimeWindowMs& TimeWindow, TMap<FString, FString>& OutMeta);
@@ -292,6 +307,7 @@ TSharedRef<FJsonObject> MakeGpuPassDetailObject(const FFrameSample& FrameSample,
 bool BuildThreadWaitSamplesTrace(
 	const FTraceContext& Context,
 	TOptional<int32> FrameIndexFilter,
+	EFrameDomain FrameDomain,
 	TArray<FThreadWaitSample>& OutSamples,
 	FString& OutFailureStage,
 	FString& OutFailureReason,
@@ -301,6 +317,7 @@ TSharedRef<FJsonObject> MakeThreadWaitObject(const FThreadWaitSample& Wait);
 bool BuildTaskTopSamples(
 	const FTraceContext& Context,
 	TOptional<int32> FrameIndexFilter,
+	EFrameDomain FrameDomain,
 	TArray<FTaskSample>& OutSamples,
 	FString& OutFailureStage,
 	FString& OutFailureReason,

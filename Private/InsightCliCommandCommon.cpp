@@ -157,6 +157,86 @@ TSharedRef<FJsonObject> MakeMetaObject(const TMap<FString, FString>& Meta)
 	return MetaObject;
 }
 
+EInsightCliTraceUnavailableSubcode ClassifyTraceUnavailableSubcode(const FString& FailureStage, const FString& FailureReason)
+{
+	const FString Stage = FailureStage.ToLower();
+	const FString Reason = FailureReason.ToLower();
+
+	if (Stage.Contains(TEXT("channel_disabled")) || Reason.Contains(TEXT("channel_disabled")))
+	{
+		return EInsightCliTraceUnavailableSubcode::ChannelDisabled;
+	}
+	if (Reason.Contains(TEXT("timeout")))
+	{
+		return EInsightCliTraceUnavailableSubcode::AnalysisTimeout;
+	}
+	if (Reason.Contains(TEXT("corrupt")) || Reason.Contains(TEXT("truncated")) || Reason.Contains(TEXT("seh")))
+	{
+		return EInsightCliTraceUnavailableSubcode::TraceCorrupted;
+	}
+	if (Stage.Contains(TEXT("frame_range")) || Reason.Contains(TEXT("frame range")))
+	{
+		return EInsightCliTraceUnavailableSubcode::FrameRangeOutOfBounds;
+	}
+	if ((Reason.Contains(TEXT("thread")) || Reason.Contains(TEXT("task")))
+		&& (Reason.Contains(TEXT("missing")) || Reason.Contains(TEXT("not present")) || Reason.Contains(TEXT("not found"))))
+	{
+		return EInsightCliTraceUnavailableSubcode::ThreadTaskMissing;
+	}
+	if (Reason.Contains(TEXT("version")) || Reason.Contains(TEXT("incompatible")))
+	{
+		return EInsightCliTraceUnavailableSubcode::IncompatibleTraceVersion;
+	}
+	if (Reason.Contains(TEXT("not found")))
+	{
+		return EInsightCliTraceUnavailableSubcode::EntityNotFound;
+	}
+	if (Stage.Contains(TEXT("provider")) || Reason.Contains(TEXT("provider")))
+	{
+		return EInsightCliTraceUnavailableSubcode::ProviderUnavailable;
+	}
+
+	return EInsightCliTraceUnavailableSubcode::Unknown;
+}
+
+FString MakeTraceUnavailableHint(const EInsightCliTraceUnavailableSubcode Subcode)
+{
+	switch (Subcode)
+	{
+	case EInsightCliTraceUnavailableSubcode::ChannelDisabled:
+		return TEXT("enable required trace channels and re-record");
+	case EInsightCliTraceUnavailableSubcode::ProviderUnavailable:
+		return TEXT("ensure the corresponding provider/channel exists in this trace");
+	case EInsightCliTraceUnavailableSubcode::FrameRangeOutOfBounds:
+		return TEXT("adjust frame-range/frame-index to an existing frame interval");
+	case EInsightCliTraceUnavailableSubcode::EntityNotFound:
+		return TEXT("verify query key/name and retry");
+	case EInsightCliTraceUnavailableSubcode::AnalysisTimeout:
+		return TEXT("retry with a narrower time window or smaller trace");
+	case EInsightCliTraceUnavailableSubcode::TraceCorrupted:
+		return TEXT("re-capture trace; current trace appears truncated/corrupted");
+	case EInsightCliTraceUnavailableSubcode::ThreadTaskMissing:
+		return TEXT("verify thread/task identifiers exist in the current trace window");
+	case EInsightCliTraceUnavailableSubcode::IncompatibleTraceVersion:
+		return TEXT("use a compatible engine build to re-record the trace");
+	case EInsightCliTraceUnavailableSubcode::Unknown:
+	default:
+		return TEXT("inspect failure_stage/failure_reason and retry with narrowed scope");
+	}
+}
+
+bool IsTraceUnavailableRetryable(const EInsightCliTraceUnavailableSubcode Subcode)
+{
+	switch (Subcode)
+	{
+	case EInsightCliTraceUnavailableSubcode::AnalysisTimeout:
+	case EInsightCliTraceUnavailableSubcode::ProviderUnavailable:
+		return true;
+	default:
+		return false;
+	}
+}
+
 }
 
 FString ToNumberString(double Value)
@@ -222,11 +302,19 @@ FInsightCliResponse MakeTraceUnavailableError(
 	const TCHAR* Message,
 	const TMap<FString, FString>& ExtraDetails)
 {
+	const FString ResolvedStageText = FailureStage.IsEmpty() ? DefaultStage : FailureStage;
+	const FString ResolvedReasonText = FailureReason.IsEmpty() ? DefaultReason : FailureReason;
+	const EInsightCliFailureStage ResolvedStage = ParseFailureStage(ResolvedStageText);
+	const EInsightCliTraceUnavailableSubcode Subcode = ClassifyTraceUnavailableSubcode(ResolvedStageText, ResolvedReasonText);
+
 	TMap<FString, FString> Details;
 	Details.Add(TEXT("trace_path"), Context.FullPath);
 	Details.Add(TEXT("consumer"), Consumer);
-	Details.Add(TEXT("failure_stage"), FailureStage.IsEmpty() ? DefaultStage : FailureStage);
-	Details.Add(TEXT("failure_reason"), FailureReason.IsEmpty() ? DefaultReason : FailureReason);
+	Details.Add(TEXT("failure_stage"), LexToString(ResolvedStage));
+	Details.Add(TEXT("failure_reason"), ResolvedReasonText);
+	Details.Add(TEXT("error_subcode"), LexToString(Subcode));
+	Details.Add(TEXT("retryable"), IsTraceUnavailableRetryable(Subcode) ? TEXT("true") : TEXT("false"));
+	Details.Add(TEXT("next_action_hint"), MakeTraceUnavailableHint(Subcode));
 	Details.Add(TEXT("data_source"), TEXT("unavailable"));
 
 	for (const TPair<FString, FString>& Detail : ExtraDetails)
@@ -234,6 +322,7 @@ FInsightCliResponse MakeTraceUnavailableError(
 		Details.Add(Detail.Key, Detail.Value);
 	}
 
+	// Keep top-level E3001 for compatibility and expose finer subtype via details.error_subcode.
 	return FInsightCliResponse::Error(10, TEXT("E3001"), Message, Details);
 }
 

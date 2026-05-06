@@ -14,12 +14,23 @@ struct FTraceContext;
 
 namespace UE::InsightCli
 {
+enum class EInsightCliCommandDataQuality : uint8
+{
+	TraceBacked,
+	ApproxOrTraceBacked,
+	Approx,
+};
+
 struct FInsightCliCommandCatalogEntry
 {
 	FString Group;
 	FString Action;
 	TArray<FString> RequiredOptions;
 	TArray<FString> OptionalOptions;
+	TArray<FString> RequiredChannels;
+	TArray<FString> OptionalChannels;
+	EInsightCliCommandDataQuality DataQuality = EInsightCliCommandDataQuality::TraceBacked;
+	bool bMayBeEmpty = true;
 };
 
 FInsightCliResponse ExecuteCommand(const FInsightCliRequest& Request);

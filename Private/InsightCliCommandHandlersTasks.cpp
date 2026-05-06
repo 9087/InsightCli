@@ -10,7 +10,14 @@ bool HandleTasksCommands(const FInsightCliRequest& Request, const FTraceContext&
 	if (Request.Group == TEXT("tasks") && Request.Action == TEXT("top"))
 	{
 		FInsightCliResponse UnknownOptionError;
-		if (!ValidateNoUnknownOptionsWithGlobals(Request.Args, { TEXT("limit"), TEXT("frame-index") }, UnknownOptionError))
+		if (!ValidateNoUnknownOptionsWithGlobals(Request.Args, { TEXT("limit"), TEXT("frame-index"), TEXT("frame-domain") }, UnknownOptionError))
+		{
+			OutResponse = UnknownOptionError;
+			return true;
+		}
+
+		EFrameDomain FrameDomain = EFrameDomain::Game;
+		if (!TryResolveFrameDomain(Request.Args, FrameDomain, UnknownOptionError))
 		{
 			OutResponse = UnknownOptionError;
 			return true;
@@ -31,7 +38,7 @@ bool HandleTasksCommands(const FInsightCliRequest& Request, const FTraceContext&
 		FString FailureReason;
 		bool bFrameFound = true;
 		int32 CycleCount = 0;
-		if (!BuildTaskTopSamples(Context, bHasFrameIndex ? TOptional<int32>(FrameIndexFilter) : TOptional<int32>(), Tasks, FailureStage, FailureReason, bFrameFound, CycleCount))
+		if (!BuildTaskTopSamples(Context, bHasFrameIndex ? TOptional<int32>(FrameIndexFilter) : TOptional<int32>(), FrameDomain, Tasks, FailureStage, FailureReason, bFrameFound, CycleCount))
 		{
 			TMap<FString, FString> ExtraDetails;
 			if (bHasFrameIndex)
@@ -71,6 +78,8 @@ bool HandleTasksCommands(const FInsightCliRequest& Request, const FTraceContext&
 		{
 			Meta.Add(TEXT("frame_index"), FString::FromInt(FrameIndexFilter));
 		}
+		Meta.Add(TEXT("frame_domain"), FrameDomain == EFrameDomain::Rendering ? TEXT("rendering") : TEXT("game"));
+		Meta.Add(TEXT("frame_domain_default"), TEXT("game"));
 		Meta.Add(TEXT("data_source"), TEXT("trace"));
 		Meta.Add(TEXT("algorithm"), TEXT("dag_longest_path"));
 		Meta.Add(TEXT("cycle_count"), FString::FromInt(CycleCount));
@@ -81,7 +90,14 @@ bool HandleTasksCommands(const FInsightCliRequest& Request, const FTraceContext&
 	if (Request.Group == TEXT("tasks") && Request.Action == TEXT("critical-path"))
 	{
 		FInsightCliResponse UnknownOptionError;
-		if (!ValidateNoUnknownOptionsWithGlobals(Request.Args, { TEXT("frame-index"), TEXT("top") }, UnknownOptionError))
+		if (!ValidateNoUnknownOptionsWithGlobals(Request.Args, { TEXT("frame-index"), TEXT("top"), TEXT("frame-domain") }, UnknownOptionError))
+		{
+			OutResponse = UnknownOptionError;
+			return true;
+		}
+
+		EFrameDomain FrameDomain = EFrameDomain::Game;
+		if (!TryResolveFrameDomain(Request.Args, FrameDomain, UnknownOptionError))
 		{
 			OutResponse = UnknownOptionError;
 			return true;
@@ -111,7 +127,7 @@ bool HandleTasksCommands(const FInsightCliRequest& Request, const FTraceContext&
 		FString FailureReason;
 		bool bFrameFound = true;
 		int32 CycleCount = 0;
-		if (!BuildTaskTopSamples(Context, FrameIndex, Tasks, FailureStage, FailureReason, bFrameFound, CycleCount))
+		if (!BuildTaskTopSamples(Context, FrameIndex, FrameDomain, Tasks, FailureStage, FailureReason, bFrameFound, CycleCount))
 		{
 			TMap<FString, FString> ExtraDetails;
 			ExtraDetails.Add(TEXT("frame_index"), FString::FromInt(FrameIndex));
@@ -195,6 +211,8 @@ bool HandleTasksCommands(const FInsightCliRequest& Request, const FTraceContext&
 
 		TMap<FString, FString> Meta;
 		Meta.Add(TEXT("frame_index"), FString::FromInt(FrameIndex));
+		Meta.Add(TEXT("frame_domain"), FrameDomain == EFrameDomain::Rendering ? TEXT("rendering") : TEXT("game"));
+		Meta.Add(TEXT("frame_domain_default"), TEXT("game"));
 		Meta.Add(TEXT("top"), FString::FromInt(TopK));
 		Meta.Add(TEXT("data_source"), TEXT("trace"));
 		Meta.Add(TEXT("algorithm"), TEXT("dag_longest_path"));

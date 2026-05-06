@@ -358,7 +358,83 @@ bool TryExtractGlobalOutputOptions(TArray<FString>& InOutArgs, FGlobalOutputOpti
 			continue;
 		}
 
+		if (Arg == TEXT("--cursor"))
+		{
+			if (Index + 1 >= InOutArgs.Num())
+			{
+				OutError = MakeOptionError(TEXT("--cursor requires an opaque value."));
+				return false;
+			}
+
+			const FString Value = InOutArgs[++Index];
+			if (Value.IsEmpty())
+			{
+				OutError = MakeOptionError(TEXT("--cursor requires a non-empty value."));
+				return false;
+			}
+
+			OutOptions.Cursor = Value;
+			continue;
+		}
+
+		if (Arg.StartsWith(TEXT("--cursor=")))
+		{
+			const FString Value = Arg.Mid(9);
+			if (Value.IsEmpty())
+			{
+				OutError = MakeOptionError(TEXT("--cursor requires a non-empty value."));
+				return false;
+			}
+
+			OutOptions.Cursor = Value;
+			continue;
+		}
+
+		if (Arg == TEXT("--page-size"))
+		{
+			if (Index + 1 >= InOutArgs.Num())
+			{
+				OutError = MakeOptionError(TEXT("--page-size requires a positive integer value."));
+				return false;
+			}
+
+			int32 ParsedPageSize = 0;
+			if (!TryParseInt(InOutArgs[++Index], ParsedPageSize) || ParsedPageSize <= 0)
+			{
+				OutError = MakeOptionError(TEXT("--page-size must be > 0."));
+				return false;
+			}
+
+			OutOptions.PageSize = ParsedPageSize;
+			continue;
+		}
+
+		if (Arg.StartsWith(TEXT("--page-size=")))
+		{
+			int32 ParsedPageSize = 0;
+			if (!TryParseInt(Arg.Mid(12), ParsedPageSize) || ParsedPageSize <= 0)
+			{
+				OutError = MakeOptionError(TEXT("--page-size must be > 0."));
+				return false;
+			}
+
+			OutOptions.PageSize = ParsedPageSize;
+			continue;
+		}
+
 		FilteredArgs.Add(Arg);
+	}
+
+	if (OutOptions.Cursor.IsSet() && !OutOptions.PageSize.IsSet())
+	{
+		OutError = MakeOptionError(TEXT("--cursor requires --page-size."));
+		return false;
+	}
+
+	if (OutOptions.PageSize.IsSet() && HasOption(FilteredArgs, TEXT("--limit")))
+	{
+		OutError = MakeOptionError(TEXT("--page-size cannot be combined with --limit."));
+		return false;
 	}
 
 	InOutArgs = MoveTemp(FilteredArgs);
@@ -416,6 +492,32 @@ bool TryGetLimitAndOptionalFrameIndexFilter(const TArray<FString>& Args, int32& 
 	}
 
 	return true;
+}
+
+bool TryResolveFrameDomain(const TArray<FString>& Args, EFrameDomain& OutDomain, FInsightCliResponse& OutError)
+{
+	OutDomain = EFrameDomain::Game;
+
+	FString Domain;
+	if (!TryGetStringOption(Args, TEXT("--frame-domain"), Domain))
+	{
+		return true;
+	}
+
+	Domain = Domain.ToLower();
+	if (Domain == TEXT("game"))
+	{
+		OutDomain = EFrameDomain::Game;
+		return true;
+	}
+	if (Domain == TEXT("rendering"))
+	{
+		OutDomain = EFrameDomain::Rendering;
+		return true;
+	}
+
+	OutError = MakeOptionError(TEXT("frame-domain must be one of: game, rendering."));
+	return false;
 }
 
 bool TryGetTimeWindowMs(const TArray<FString>& Args, FTimeWindowMs& OutWindow, FInsightCliResponse& OutError)
