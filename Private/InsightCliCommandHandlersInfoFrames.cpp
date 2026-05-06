@@ -53,38 +53,6 @@ TArray<TSharedPtr<FJsonValue>> BuildThreadBreakdownData(const FFrameSample& Fram
 	return Data;
 }
 
-FString ClassifyStatGroupBucket(const FString& ScopeName)
-{
-	if (ScopeName.Contains(TEXT("World Tick"), ESearchCase::IgnoreCase)
-		|| ScopeName.Contains(TEXT("UWorld::Tick"), ESearchCase::IgnoreCase)
-		|| ScopeName.Contains(TEXT("Tick"), ESearchCase::IgnoreCase))
-	{
-		return TEXT("world_tick");
-	}
-	if (ScopeName.Contains(TEXT("Anim"), ESearchCase::IgnoreCase))
-	{
-		return TEXT("animation");
-	}
-	if (ScopeName.Contains(TEXT("Physics"), ESearchCase::IgnoreCase)
-		|| ScopeName.Contains(TEXT("Chaos"), ESearchCase::IgnoreCase))
-	{
-		return TEXT("physics");
-	}
-	if (ScopeName.Contains(TEXT("Garbage"), ESearchCase::IgnoreCase)
-		|| ScopeName.Contains(TEXT("CollectGarbage"), ESearchCase::IgnoreCase)
-		|| ScopeName.Contains(TEXT("GC"), ESearchCase::IgnoreCase))
-	{
-		return TEXT("gc");
-	}
-	if (ScopeName.Contains(TEXT("Slate"), ESearchCase::IgnoreCase)
-		|| ScopeName.Contains(TEXT("UI"), ESearchCase::IgnoreCase))
-	{
-		return TEXT("slate");
-	}
-
-	return TEXT("other");
-}
-
 bool BuildStatGroupBreakdownData(
 	const FTraceContext& Context,
 	const FFrameSample& Frame,
@@ -146,7 +114,7 @@ bool BuildStatGroupBreakdownData(
 		if (Row != nullptr && Row->Timer != nullptr && !Row->Timer->IsGpuTimer)
 		{
 			const FString ScopeName = Row->Timer->Name != nullptr ? Row->Timer->Name : TEXT("<unknown>");
-			const FString Bucket = ClassifyStatGroupBucket(ScopeName);
+			const FString Bucket = ClassifyCpuStatGroup(ScopeName);
 			double& Ms = BucketMs.FindOrAdd(Bucket);
 			Ms += FMath::Max(0.0, Row->TotalExclusiveTime * 1000.0);
 		}
@@ -432,6 +400,10 @@ bool HandleInfoAndFramesCommands(const FInsightCliRequest& Request, const FTrace
 		if (bHasBreakdown)
 		{
 			Meta.Add(TEXT("breakdown"), Breakdown);
+			if (Breakdown == TEXT("statgroup"))
+			{
+				Meta.Add(TEXT("classifier"), TEXT("strict_token"));
+			}
 		}
 		OutResponse = FInsightCliResponse::Ok(MakeEnvelopeWithObject(DetailObject, Meta));
 		return true;

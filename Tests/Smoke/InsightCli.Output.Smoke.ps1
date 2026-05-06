@@ -1120,15 +1120,36 @@ function Invoke-NormalTraceSmoke {
             if ($framesDetailStatgroupJson.meta.breakdown -ne 'statgroup') {
                 throw 'Expected frames detail statgroup breakdown meta.breakdown=statgroup'
             }
+            if ($framesDetailStatgroupJson.meta.classifier -ne 'strict_token') {
+                throw 'Expected frames detail statgroup breakdown meta.classifier=strict_token'
+            }
             if ($null -eq $framesDetailStatgroupJson.data.breakdown) {
                 throw 'Expected frames detail statgroup breakdown to include data.breakdown'
             }
+
+            $allowedGroups = @('world_tick', 'animation', 'physics', 'gc', 'slate', 'other')
             foreach ($item in $framesDetailStatgroupJson.data.breakdown) {
                 if ([string]::IsNullOrWhiteSpace([string]$item.bucket)) {
                     throw 'Expected bucket in frames detail statgroup breakdown rows'
                 }
+                if ($allowedGroups -notcontains ([string]$item.bucket)) {
+                    throw "Expected statgroup bucket to be in strict set. Actual: $([string]$item.bucket)"
+                }
                 if ($null -eq $item.ms -or $null -eq $item.ratio) {
                     throw 'Expected ms and ratio in frames detail statgroup breakdown rows'
+                }
+            }
+
+            $cpuGroupsResult = Invoke-InsightCli -Args @($TracePath, 'cpu', 'stat-groups')
+            if ($cpuGroupsResult.ExitCode -ne 0) {
+                throw 'Expected cpu stat-groups to succeed for consistency check'
+            }
+            $cpuGroupsJson = Parse-JsonOutput -Text $cpuGroupsResult.Text -Context 'cpu stat-groups consistency'
+            $cpuGroupNames = @($cpuGroupsJson.data | ForEach-Object { [string]$_.name })
+            foreach ($item in $framesDetailStatgroupJson.data.breakdown) {
+                $bucketName = [string]$item.bucket
+                if ($cpuGroupNames -notcontains $bucketName) {
+                    throw "Expected frames detail statgroup bucket to exist in cpu stat-groups: $bucketName"
                 }
             }
 
