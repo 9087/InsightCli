@@ -6,6 +6,8 @@ namespace UE::InsightCli::Internal
 {
 namespace
 {
+constexpr bool bEnableLegacyCpuScopeFallback = false;
+
 struct FPhysicsStageAggregate
 {
 	FString Stage;
@@ -73,8 +75,8 @@ FString GuessBodyName(const FString& ScopeName)
 
 void AddFallbackMeta(TMap<FString, FString>& Meta)
 {
-	Meta.Add(TEXT("data_source"), TEXT("cpu_scope_pattern"));
-	AddMetaWarning(Meta, TEXT("Physics channel unavailable; values are approximated from CPU scope patterns."));
+	Meta.Add(TEXT("data_source"), TEXT("cpu_scope_pattern_experimental"));
+	AddMetaWarning(Meta, TEXT("Physics channel unavailable; experimental CPU scope-pattern fallback enabled."));
 }
 
 bool BuildPhysicsRows(const FTraceContext& Context, TArray<FCpuScopeSample>& OutRows, FString& OutFailureStage, FString& OutFailureReason)
@@ -126,6 +128,15 @@ bool HandlePhysicsCommands(const FInsightCliRequest& Request, const FTraceContex
 			return true;
 		}
 
+		if (!bEnableLegacyCpuScopeFallback)
+		{
+			OutResponse = MakePhysicsChannelDisabledError(
+				Context,
+				TEXT("physics.summary"),
+				TEXT("Physics trace channel is disabled or unavailable for this trace."));
+			return true;
+		}
+
 		bool bHasFrameIndex = false;
 		int32 FrameIndex = -1;
 		if (TryGetIntOption(Request.Args, TEXT("--frame-index"), FrameIndex))
@@ -156,12 +167,6 @@ bool HandlePhysicsCommands(const FInsightCliRequest& Request, const FTraceContex
 				return true;
 			}
 		}
-
-		OutResponse = MakePhysicsChannelDisabledError(
-			Context,
-			TEXT("physics.summary"),
-			TEXT("Physics trace channel is disabled or unavailable for this trace."));
-		return true;
 
 		TArray<FCpuScopeSample> PhysicsRows;
 		FString FailureStage;
@@ -234,11 +239,14 @@ bool HandlePhysicsCommands(const FInsightCliRequest& Request, const FTraceContex
 			return true;
 		}
 
-		OutResponse = MakePhysicsChannelDisabledError(
-			Context,
-			TEXT("physics.solver-stages"),
-			TEXT("Physics trace channel is disabled or unavailable for this trace."));
-		return true;
+		if (!bEnableLegacyCpuScopeFallback)
+		{
+			OutResponse = MakePhysicsChannelDisabledError(
+				Context,
+				TEXT("physics.solver-stages"),
+				TEXT("Physics trace channel is disabled or unavailable for this trace."));
+			return true;
+		}
 
 		TArray<FCpuScopeSample> PhysicsRows;
 		FString FailureStage;
@@ -314,11 +322,14 @@ bool HandlePhysicsCommands(const FInsightCliRequest& Request, const FTraceContex
 			return true;
 		}
 
-		OutResponse = MakePhysicsChannelDisabledError(
-			Context,
-			TEXT("physics.top-bodies"),
-			TEXT("Physics trace channel is disabled or unavailable for this trace."));
-		return true;
+		if (!bEnableLegacyCpuScopeFallback)
+		{
+			OutResponse = MakePhysicsChannelDisabledError(
+				Context,
+				TEXT("physics.top-bodies"),
+				TEXT("Physics trace channel is disabled or unavailable for this trace."));
+			return true;
+		}
 
 		TArray<FCpuScopeSample> PhysicsRows;
 		FString FailureStage;

@@ -6,6 +6,8 @@ namespace UE::InsightCli::Internal
 {
 namespace
 {
+constexpr bool bEnableLegacyCpuScopeFallback = false;
+
 struct FNetAggregateRow
 {
 	FString Key;
@@ -59,8 +61,8 @@ void SortRows(TArray<FNetAggregateRow>& Rows)
 
 void AddFallbackMeta(TMap<FString, FString>& Meta)
 {
-	Meta.Add(TEXT("data_source"), TEXT("cpu_scope_pattern"));
-	AddMetaWarning(Meta, TEXT("Net channel unavailable; values are approximated from CPU scope patterns."));
+	Meta.Add(TEXT("data_source"), TEXT("cpu_scope_pattern_experimental"));
+	AddMetaWarning(Meta, TEXT("Net channel unavailable; experimental CPU scope-pattern fallback enabled."));
 }
 
 bool BuildNetCpuRows(const FTraceContext& Context, TArray<FCpuScopeSample>& OutRows, FString& OutFailureStage, FString& OutFailureReason)
@@ -112,11 +114,14 @@ bool HandleNetCommands(const FInsightCliRequest& Request, const FTraceContext& C
 			return true;
 		}
 
-		OutResponse = MakeNetChannelDisabledError(
-			Context,
-			TEXT("net.summary"),
-			TEXT("Net trace channel is disabled or unavailable for this trace."));
-		return true;
+		if (!bEnableLegacyCpuScopeFallback)
+		{
+			OutResponse = MakeNetChannelDisabledError(
+				Context,
+				TEXT("net.summary"),
+				TEXT("Net trace channel is disabled or unavailable for this trace."));
+			return true;
+		}
 
 		TArray<FCpuScopeSample> NetRows;
 		FString FailureStage;
@@ -176,11 +181,14 @@ bool HandleNetCommands(const FInsightCliRequest& Request, const FTraceContext& C
 			return true;
 		}
 
-		OutResponse = MakeNetChannelDisabledError(
-			Context,
-			TEXT("net.top-actors"),
-			TEXT("Net trace channel is disabled or unavailable for this trace."));
-		return true;
+		if (!bEnableLegacyCpuScopeFallback)
+		{
+			OutResponse = MakeNetChannelDisabledError(
+				Context,
+				TEXT("net.top-actors"),
+				TEXT("Net trace channel is disabled or unavailable for this trace."));
+			return true;
+		}
 
 		TArray<FCpuScopeSample> NetRows;
 		FString FailureStage;
@@ -254,11 +262,14 @@ bool HandleNetCommands(const FInsightCliRequest& Request, const FTraceContext& C
 			return true;
 		}
 
-		OutResponse = MakeNetChannelDisabledError(
-			Context,
-			TEXT("net.top-rpcs"),
-			TEXT("Net trace channel is disabled or unavailable for this trace."));
-		return true;
+		if (!bEnableLegacyCpuScopeFallback)
+		{
+			OutResponse = MakeNetChannelDisabledError(
+				Context,
+				TEXT("net.top-rpcs"),
+				TEXT("Net trace channel is disabled or unavailable for this trace."));
+			return true;
+		}
 
 		TArray<FCpuScopeSample> NetRows;
 		FString FailureStage;
@@ -333,11 +344,14 @@ bool HandleNetCommands(const FInsightCliRequest& Request, const FTraceContext& C
 			return true;
 		}
 
-		OutResponse = MakeNetChannelDisabledError(
-			Context,
-			TEXT("net.bandwidth-series"),
-			TEXT("Net trace channel is disabled or unavailable for this trace."));
-		return true;
+		if (!bEnableLegacyCpuScopeFallback)
+		{
+			OutResponse = MakeNetChannelDisabledError(
+				Context,
+				TEXT("net.bandwidth-series"),
+				TEXT("Net trace channel is disabled or unavailable for this trace."));
+			return true;
+		}
 
 		FInsightCliResponse FrameGuardError;
 		if (!EnsureTraceBackedFrameSamples(Context, FrameGuardError, TEXT("net.bandwidth-series")))

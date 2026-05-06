@@ -6,6 +6,8 @@ namespace UE::InsightCli::Internal
 {
 namespace
 {
+constexpr bool bEnableLegacyCpuScopeFallback = false;
+
 struct FNiagaraAggregateRow
 {
 	FString Name;
@@ -41,8 +43,8 @@ FString GuessSystemName(const FString& ScopeName)
 
 void AddFallbackMeta(TMap<FString, FString>& Meta)
 {
-	Meta.Add(TEXT("data_source"), TEXT("cpu_scope_pattern"));
-	AddMetaWarning(Meta, TEXT("Niagara channel unavailable; values are approximated from CPU scope patterns."));
+	Meta.Add(TEXT("data_source"), TEXT("cpu_scope_pattern_experimental"));
+	AddMetaWarning(Meta, TEXT("Niagara channel unavailable; experimental CPU scope-pattern fallback enabled."));
 }
 
 FInsightCliResponse MakeNiagaraChannelDisabledError(const FTraceContext& Context, const TCHAR* Consumer, const TCHAR* Message)
@@ -81,11 +83,14 @@ bool HandleNiagaraCommands(const FInsightCliRequest& Request, const FTraceContex
 			return true;
 		}
 
-		OutResponse = MakeNiagaraChannelDisabledError(
-			Context,
-			TEXT("niagara.top-systems"),
-			TEXT("Niagara trace channel is disabled or unavailable for this trace."));
-		return true;
+		if (!bEnableLegacyCpuScopeFallback)
+		{
+			OutResponse = MakeNiagaraChannelDisabledError(
+				Context,
+				TEXT("niagara.top-systems"),
+				TEXT("Niagara trace channel is disabled or unavailable for this trace."));
+			return true;
+		}
 
 		TArray<FCpuScopeSample> CpuRows;
 		FString FailureStage;
@@ -169,11 +174,14 @@ bool HandleNiagaraCommands(const FInsightCliRequest& Request, const FTraceContex
 			return true;
 		}
 
-		OutResponse = MakeNiagaraChannelDisabledError(
-			Context,
-			TEXT("niagara.emitter-cost"),
-			TEXT("Niagara trace channel is disabled or unavailable for this trace."));
-		return true;
+		if (!bEnableLegacyCpuScopeFallback)
+		{
+			OutResponse = MakeNiagaraChannelDisabledError(
+				Context,
+				TEXT("niagara.emitter-cost"),
+				TEXT("Niagara trace channel is disabled or unavailable for this trace."));
+			return true;
+		}
 
 		TArray<FCpuScopeSample> CpuRows;
 		FString FailureStage;

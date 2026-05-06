@@ -6,6 +6,8 @@ namespace UE::InsightCli::Internal
 {
 namespace
 {
+constexpr bool bEnableLegacyCpuScopeFallback = false;
+
 enum class ESlateMetric
 {
 	Paint,
@@ -162,11 +164,14 @@ bool HandleSlateCommands(const FInsightCliRequest& Request, const FTraceContext&
 			return true;
 		}
 
-		OutResponse = MakeSlateChannelDisabledError(
-			Context,
-			TEXT("slate.top-widgets"),
-			TEXT("Slate trace channel is disabled or unavailable for this trace."));
-		return true;
+		if (!bEnableLegacyCpuScopeFallback)
+		{
+			OutResponse = MakeSlateChannelDisabledError(
+				Context,
+				TEXT("slate.top-widgets"),
+				TEXT("Slate trace channel is disabled or unavailable for this trace."));
+			return true;
+		}
 
 		TArray<FCpuScopeSample> Rows;
 		FString FailureStage;
@@ -202,7 +207,7 @@ bool HandleSlateCommands(const FInsightCliRequest& Request, const FTraceContext&
 		TMap<FString, FString> Meta;
 		Meta.Add(TEXT("limit"), FString::FromInt(Limit));
 		Meta.Add(TEXT("by"), By);
-		Meta.Add(TEXT("data_source"), TEXT("cpu_scope_pattern"));
+		Meta.Add(TEXT("data_source"), TEXT("cpu_scope_pattern_experimental"));
 		if (Rows.IsEmpty())
 		{
 			AddMetaWarning(Meta, TEXT("Slate channel unavailable or no matching scope samples."));
@@ -233,11 +238,14 @@ bool HandleSlateCommands(const FInsightCliRequest& Request, const FTraceContext&
 			return true;
 		}
 
-		OutResponse = MakeSlateChannelDisabledError(
-			Context,
-			TEXT("slate.paint-cost"),
-			TEXT("Slate trace channel is disabled or unavailable for this trace."));
-		return true;
+		if (!bEnableLegacyCpuScopeFallback)
+		{
+			OutResponse = MakeSlateChannelDisabledError(
+				Context,
+				TEXT("slate.paint-cost"),
+				TEXT("Slate trace channel is disabled or unavailable for this trace."));
+			return true;
+		}
 
 		FInsightCliResponse FrameGuardError;
 		if (!EnsureTraceBackedFrameSamples(Context, FrameGuardError, TEXT("slate.paint-cost")))
@@ -255,7 +263,7 @@ bool HandleSlateCommands(const FInsightCliRequest& Request, const FTraceContext&
 		if (Found == nullptr)
 		{
 			TMap<FString, FString> Meta = MakeNotFoundMeta(Request, TEXT("not_found"), TEXT("frame-index"), FString::FromInt(FrameIndex));
-			Meta.Add(TEXT("data_source"), TEXT("cpu_scope_pattern"));
+			Meta.Add(TEXT("data_source"), TEXT("cpu_scope_pattern_experimental"));
 			OutResponse = FInsightCliResponse::Ok(MakeEnvelopeWithArray({}, Meta));
 			return true;
 		}
@@ -289,7 +297,7 @@ bool HandleSlateCommands(const FInsightCliRequest& Request, const FTraceContext&
 
 		TMap<FString, FString> Meta;
 		Meta.Add(TEXT("frame_index"), FString::FromInt(FrameIndex));
-		Meta.Add(TEXT("data_source"), TEXT("cpu_scope_pattern"));
+		Meta.Add(TEXT("data_source"), TEXT("cpu_scope_pattern_experimental"));
 		AddMetaWarning(Meta, TEXT("Approximation from CPU scope pattern; frame-local Slate channel data unavailable."));
 		OutResponse = FInsightCliResponse::Ok(MakeEnvelopeWithObject(Data, Meta));
 		return true;
@@ -312,11 +320,14 @@ bool HandleSlateCommands(const FInsightCliRequest& Request, const FTraceContext&
 			return true;
 		}
 
-		OutResponse = MakeSlateChannelDisabledError(
-			Context,
-			TEXT("slate.invalidation-rate"),
-			TEXT("Slate trace channel is disabled or unavailable for this trace."));
-		return true;
+		if (!bEnableLegacyCpuScopeFallback)
+		{
+			OutResponse = MakeSlateChannelDisabledError(
+				Context,
+				TEXT("slate.invalidation-rate"),
+				TEXT("Slate trace channel is disabled or unavailable for this trace."));
+			return true;
+		}
 
 		TArray<FCpuScopeSample> Rows;
 		FString FailureStage;
@@ -349,7 +360,7 @@ bool HandleSlateCommands(const FInsightCliRequest& Request, const FTraceContext&
 		Data->SetNumberField(TEXT("invalidations_per_sec"), InvalidationsPerSec);
 
 		TMap<FString, FString> Meta;
-		Meta.Add(TEXT("data_source"), TEXT("cpu_scope_pattern"));
+		Meta.Add(TEXT("data_source"), TEXT("cpu_scope_pattern_experimental"));
 		AddMetaWarning(Meta, TEXT("Slate invalidation-rate is approximated by CPU scope pattern because Slate trace channel may be unavailable."));
 		AppendTimeWindowMeta(TimeWindow, Meta);
 		OutResponse = FInsightCliResponse::Ok(MakeEnvelopeWithObject(Data, Meta));

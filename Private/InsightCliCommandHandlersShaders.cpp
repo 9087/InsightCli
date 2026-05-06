@@ -6,6 +6,8 @@ namespace UE::InsightCli::Internal
 {
 namespace
 {
+constexpr bool bEnableLegacyCpuScopeFallback = false;
+
 bool IsShaderCompileScope(const FString& ScopeName)
 {
 	const FString Lower = ScopeName.ToLower();
@@ -23,8 +25,8 @@ bool IsPsoMissScope(const FString& ScopeName)
 
 void AddFallbackMeta(TMap<FString, FString>& Meta)
 {
-	Meta.Add(TEXT("data_source"), TEXT("cpu_scope_pattern"));
-	AddMetaWarning(Meta, TEXT("Shader/PSO channel unavailable; values are approximated from CPU scope patterns."));
+	Meta.Add(TEXT("data_source"), TEXT("cpu_scope_pattern_experimental"));
+	AddMetaWarning(Meta, TEXT("Shader/PSO channel unavailable; experimental CPU scope-pattern fallback enabled."));
 }
 
 bool BuildShaderRows(const FTraceContext& Context, TArray<FCpuScopeSample>& OutRows, FString& OutFailureStage, FString& OutFailureReason)
@@ -92,11 +94,14 @@ bool HandleShadersCommands(const FInsightCliRequest& Request, const FTraceContex
 			return true;
 		}
 
-		OutResponse = MakeShadersChannelDisabledError(
-			Context,
-			TEXT("shaders.compile-events"),
-			TEXT("Shader trace channel is disabled or unavailable for this trace."));
-		return true;
+		if (!bEnableLegacyCpuScopeFallback)
+		{
+			OutResponse = MakeShadersChannelDisabledError(
+				Context,
+				TEXT("shaders.compile-events"),
+				TEXT("Shader trace channel is disabled or unavailable for this trace."));
+			return true;
+		}
 
 		TArray<FCpuScopeSample> ShaderRows;
 		FString FailureStage;
@@ -145,11 +150,14 @@ bool HandleShadersCommands(const FInsightCliRequest& Request, const FTraceContex
 			return true;
 		}
 
-		OutResponse = MakeShadersChannelDisabledError(
-			Context,
-			TEXT("shaders.pso-cache-misses"),
-			TEXT("Shader trace channel is disabled or unavailable for this trace."));
-		return true;
+		if (!bEnableLegacyCpuScopeFallback)
+		{
+			OutResponse = MakeShadersChannelDisabledError(
+				Context,
+				TEXT("shaders.pso-cache-misses"),
+				TEXT("Shader trace channel is disabled or unavailable for this trace."));
+			return true;
+		}
 
 		TArray<FCpuScopeSample> ShaderRows;
 		FString FailureStage;

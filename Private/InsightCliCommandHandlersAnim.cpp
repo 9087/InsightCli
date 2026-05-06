@@ -6,6 +6,8 @@ namespace UE::InsightCli::Internal
 {
 namespace
 {
+constexpr bool bEnableLegacyCpuScopeFallback = false;
+
 struct FAnimAggregateRow
 {
 	FString Key;
@@ -79,7 +81,7 @@ void SortAggregateRows(TArray<FAnimAggregateRow>& Rows)
 
 void AddFallbackMeta(TMap<FString, FString>& Meta, const TCHAR* Warning)
 {
-	Meta.Add(TEXT("data_source"), TEXT("cpu_scope_pattern"));
+	Meta.Add(TEXT("data_source"), TEXT("cpu_scope_pattern_experimental"));
 	AddMetaWarning(Meta, Warning);
 }
 
@@ -119,11 +121,14 @@ bool HandleAnimCommands(const FInsightCliRequest& Request, const FTraceContext& 
 			return true;
 		}
 
-		OutResponse = MakeAnimChannelDisabledError(
-			Context,
-			TEXT("anim.top-actors"),
-			TEXT("Animation trace channel is disabled or unavailable for this trace."));
-		return true;
+		if (!bEnableLegacyCpuScopeFallback)
+		{
+			OutResponse = MakeAnimChannelDisabledError(
+				Context,
+				TEXT("anim.top-actors"),
+				TEXT("Animation trace channel is disabled or unavailable for this trace."));
+			return true;
+		}
 
 		TArray<FCpuScopeSample> CpuRows;
 		FString FailureStage;
@@ -173,7 +178,7 @@ bool HandleAnimCommands(const FInsightCliRequest& Request, const FTraceContext& 
 
 		TMap<FString, FString> Meta;
 		Meta.Add(TEXT("limit"), FString::FromInt(Limit));
-		AddFallbackMeta(Meta, TEXT("Animation channel unavailable; values approximated from CPU scope patterns."));
+		AddFallbackMeta(Meta, TEXT("Animation channel unavailable; experimental CPU scope-pattern fallback enabled."));
 		OutResponse = FInsightCliResponse::Ok(MakeEnvelopeWithArray(Data, Meta));
 		return true;
 	}
@@ -193,11 +198,14 @@ bool HandleAnimCommands(const FInsightCliRequest& Request, const FTraceContext& 
 			return true;
 		}
 
-		OutResponse = MakeAnimChannelDisabledError(
-			Context,
-			TEXT("anim.graph"),
-			TEXT("Animation trace channel is disabled or unavailable for this trace."));
-		return true;
+		if (!bEnableLegacyCpuScopeFallback)
+		{
+			OutResponse = MakeAnimChannelDisabledError(
+				Context,
+				TEXT("anim.graph"),
+				TEXT("Animation trace channel is disabled or unavailable for this trace."));
+			return true;
+		}
 
 		TArray<FCpuScopeSample> CpuRows;
 		FString FailureStage;
@@ -260,7 +268,7 @@ bool HandleAnimCommands(const FInsightCliRequest& Request, const FTraceContext& 
 			Meta.Add(TEXT("query_key"), TEXT("actor"));
 			Meta.Add(TEXT("query_value"), ActorName);
 		}
-		AddFallbackMeta(Meta, TEXT("Animation graph values are approximated from CPU scope patterns."));
+		AddFallbackMeta(Meta, TEXT("Animation graph values use experimental CPU scope-pattern fallback."));
 		OutResponse = FInsightCliResponse::Ok(MakeEnvelopeWithArray(Data, Meta));
 		return true;
 	}
@@ -282,11 +290,14 @@ bool HandleAnimCommands(const FInsightCliRequest& Request, const FTraceContext& 
 			return true;
 		}
 
-		OutResponse = MakeAnimChannelDisabledError(
-			Context,
-			TEXT("anim.skinning"),
-			TEXT("Animation trace channel is disabled or unavailable for this trace."));
-		return true;
+		if (!bEnableLegacyCpuScopeFallback)
+		{
+			OutResponse = MakeAnimChannelDisabledError(
+				Context,
+				TEXT("anim.skinning"),
+				TEXT("Animation trace channel is disabled or unavailable for this trace."));
+			return true;
+		}
 
 		TArray<FCpuScopeSample> CpuRows;
 		FString FailureStage;
@@ -339,7 +350,7 @@ bool HandleAnimCommands(const FInsightCliRequest& Request, const FTraceContext& 
 
 		TMap<FString, FString> Meta;
 		Meta.Add(TEXT("limit"), FString::FromInt(Limit));
-		AddFallbackMeta(Meta, TEXT("Animation skinning values are approximated from CPU scope patterns."));
+		AddFallbackMeta(Meta, TEXT("Animation skinning values use experimental CPU scope-pattern fallback."));
 		OutResponse = FInsightCliResponse::Ok(MakeEnvelopeWithArray(Data, Meta));
 		return true;
 	}

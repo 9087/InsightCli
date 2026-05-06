@@ -69,6 +69,9 @@ function Assert-TraceUnavailableChannelDisabled {
     if ($Text -notmatch '"unavailable_reason"\s*:\s*"channel_disabled"') {
         throw "Expected $Context output to contain unavailable_reason=channel_disabled"
     }
+    if ($Text -match 'cpu_scope_pattern') {
+        throw "Expected $Context output to avoid legacy cpu_scope_pattern markers"
+    }
 }
 
 function Invoke-InsightCli {
