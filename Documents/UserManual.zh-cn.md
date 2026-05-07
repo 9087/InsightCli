@@ -1,7 +1,7 @@
 # InsightCli 用户手册
 
 版本: 1.0
-最后更新: 2026-05-03
+最后更新: 2026-05-07
 语言: 简体中文
 
 ## 1. InsightCli 是什么
@@ -78,7 +78,22 @@ InsightCli.exe C:/traces/run01.utrace frames summary
 - `E1002`: trace 文件扩展名不受支持。
 - `E1003`: 参数或参数值非法。
 - `E2001`: 未知命令/动作，或请求实体不存在。
-- `E3001`: 当前命令依赖的 trace provider 不可用。
+- `E3001`: trace-backed 不可用（兼容顶层错误码）。
+
+在 trace 不可用路径中，`details` 现包含结构化字段：
+- `error_subcode`：细分子码（`E3001`..`E3008`）。
+- `retryable`：`true|false`。
+- `next_action_hint`：下一步建议。
+
+常见子码：
+- `E3001`：channel disabled。
+- `E3002`：provider unavailable。
+- `E3003`：frame-range/frame-index 越界。
+- `E3004`：实体未找到。
+- `E3005`：分析超时。
+- `E3006`：trace 截断/损坏。
+- `E3007`：trace 中缺失 thread/task id。
+- `E3008`：trace 版本不兼容。
 
 ## 4. 全局行为与约定
 
@@ -88,6 +103,23 @@ InsightCli.exe C:/traces/run01.utrace frames summary
 - 全局输出选项：
   - `--fields a,b,c`：对 `data` 行/对象做字段投影。未知字段会被忽略，并在 `meta.fields_missing` 回显。
   - `--max-rows N`：对 `data` 数组施加软上限。发生截断时会返回 `meta.truncated=true` 与 `meta.row_count_actual`。
+  - `--page-size N`：服务端分页大小。
+  - `--cursor <opaque>`：上一页返回的分页游标（`meta.next_cursor`）。
+- 分页元数据：
+  - `meta.cursor_schema`（当前为 `v1`）
+  - `meta.row_count_total`
+  - `meta.row_count_returned`
+  - `meta.next_cursor`（无下一页时为 `null`）
+- 分页约束：
+  - `--cursor` 必须与 `--page-size` 一起使用。
+  - `--page-size` 不能与 `--limit` 同时使用。
+- 帧域约定：
+  - 默认帧域为 `game`。
+  - 支持 `--frame-domain` 的命令可选：`game|rendering`。
+  - 响应中可能包含 `frame_domain`、`frame_domain_default`、`game_frame_index`、`rendering_frame_index`。
+- 顶层目录命令：
+  - `help` 会包含每个命令的 `quality_tag` 与 channel 依赖信息。
+  - `schema` 会包含 `required_channels`、`optional_channels`、`data_quality`、`may_be_empty`。
 - 在合法查询场景中，`not found` 通常表现为：
   - 退出码 `0`
   - 空 `data`
@@ -137,6 +169,23 @@ InsightCli.exe C:/traces/run01.utrace info summary
 - end_timestamp 由 start_timestamp + duration_ms 推导；当 duration_ms 为 0 时，end_timestamp 为 null。
 - 不可用字段统一编码为 JSON null，并在 meta.unavailable_fields 中列出字段名。
 - `thread_id = -1` 表示该行字段未指定（unspecified），不对应具体的 trace 线程 ID。
+- `meta.frame_domain_default` 表示默认帧域语义（当前为 `game`）。
+
+## 5.1.1 `info capabilities`
+
+用途：
+- 按当前 trace channel 状态，输出命令可用性矩阵。
+
+输出：
+- 每个命令的状态：`available|partial|unavailable`。
+- 包含命令质量元数据（`data_quality`、`may_be_empty`）和缺失必需 channel。
+- 汇总元数据包含 `available_count`、`partial_count`、`unavailable_count`。
+
+示例：
+
+```powershell
+InsightCli.exe C:/traces/run01.utrace info capabilities
+```
 
 ## 5.2 `frames summary`
 
@@ -570,7 +619,9 @@ InsightCli.exe C:/traces/run01.utrace rhi drawcalls --limit 5
 - 返回按 draw call 数排序的材质热点分桶。
 
 说明：
-- 当 material 维度 channel 不可用时，输出单个 `unknown` 分桶。
+- 依赖 RHI draw channel（`RHIDraws`/`RDG`）。
+- 若必需 channel 被禁用，返回 trace-unavailable 错误（`E3001`），并带 `details.unavailable_reason=channel_disabled`。
+- 不再提供 legacy 的单 `unknown` 兜底桶。
 
 ## 5.8.5 `rhi top-meshes`
 
@@ -578,7 +629,9 @@ InsightCli.exe C:/traces/run01.utrace rhi drawcalls --limit 5
 - 返回按 draw call 数排序的 mesh 热点分桶。
 
 说明：
-- 当 mesh 维度 channel 不可用时，输出单个 `unknown` 分桶。
+- 依赖 RHI draw channel（`RHIDraws`/`RDG`）。
+- 若必需 channel 被禁用，返回 trace-unavailable 错误（`E3001`），并带 `details.unavailable_reason=channel_disabled`。
+- 不再提供 legacy 的单 `unknown` 兜底桶。
 
 ## 5.8.6 `slate top-widgets`
 
@@ -757,6 +810,7 @@ InsightCli.exe C:/traces/run01.utrace rhi drawcalls --limit 5
 参数：
 - `--frame-index <n>`（可选）：仅查看指定帧内的等待样本。
 - `--limit <n>`：返回等待样本数量上限。
+- `--frame-domain <game|rendering>`（可选）：frame-index 所属帧域，默认 `game`。
 
 示例：
 
@@ -771,10 +825,13 @@ InsightCli.exe C:/traces/run01.utrace threads waits --frame-index 120 --limit 5
   "data": [
     {
       "frame_index": 120,
+      "game_frame_index": 120,
+      "rendering_frame_index": 119,
       "thread_id": 1234,
       "thread_name": "GameThread",
       "wait_type": "Event",
       "wait_object": "SyncObj#1200",
+      "wait_source_provider": "ContextSwitchesProvider",
       "wait_ms": 3.5,
       "owner_thread_id": 5678,
       "owner_thread_name": "RenderThread",
@@ -788,6 +845,13 @@ InsightCli.exe C:/traces/run01.utrace threads waits --frame-index 120 --limit 5
       "end_ms": 5104.5
     }
   ]
+  ,
+  "meta": {
+    "frame_domain": "game",
+    "frame_domain_default": "game",
+    "wait_source_provider": "ContextSwitchesProvider",
+    "data_source": "context_switch_heuristic"
+  }
 }
 ```
 
@@ -801,6 +865,7 @@ InsightCli.exe C:/traces/run01.utrace threads waits --frame-index 120 --limit 5
 - `--depth <n>`：输出链路最大跳数，默认 `4`。
 - `--time-start <ms>`：时间窗口起点（毫秒，包含）。
 - `--time-end <ms>`：时间窗口终点（毫秒，不包含）。
+- `--frame-domain <game|rendering>`（可选）：frame-index 所属帧域，默认 `game`。
 
 示例：
 
@@ -849,7 +914,10 @@ InsightCli.exe C:/traces/run01.utrace threads wait-chain --thread GameThread --d
   "meta": {
     "thread": "GameThread",
     "depth": "4",
-    "data_source": "trace"
+    "frame_domain": "game",
+    "frame_domain_default": "game",
+    "wait_source_provider": "ContextSwitchesProvider",
+    "data_source": "context_switch_heuristic"
   }
 }
 ```
@@ -862,6 +930,7 @@ InsightCli.exe C:/traces/run01.utrace threads wait-chain --thread GameThread --d
 参数：
 - `--frame-index <n>`（可选）：仅查看指定帧内的任务诊断。
 - `--limit <n>`：返回任务记录数量上限。
+- `--frame-domain <game|rendering>`（可选）：frame-index 所属帧域，默认 `game`。
 
 示例：
 
@@ -877,6 +946,8 @@ InsightCli.exe C:/traces/run01.utrace tasks top --frame-index 120 --limit 5
     {
       "task_id": 1001,
       "frame_index": 120,
+      "game_frame_index": 120,
+      "rendering_frame_index": 119,
       "task_name": "BuildVisibilityLists",
       "queue_name": "AnyThread",
       "dependency_task_ids": [1000],
@@ -893,6 +964,12 @@ InsightCli.exe C:/traces/run01.utrace tasks top --frame-index 120 --limit 5
       "worker_thread_id": 72
     }
   ]
+  ,
+  "meta": {
+    "frame_domain": "game",
+    "frame_domain_default": "game",
+    "data_source": "trace"
+  }
 }
 ```
 
@@ -904,6 +981,7 @@ InsightCli.exe C:/traces/run01.utrace tasks top --frame-index 120 --limit 5
 参数：
 - `--frame-index <n>`（必填）：目标帧索引。
 - `--top <k>`：返回关键路径数量，默认 `3`。
+- `--frame-domain <game|rendering>`（可选）：frame-index 所属帧域，默认 `game`。
 
 示例：
 

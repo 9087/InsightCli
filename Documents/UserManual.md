@@ -1,7 +1,7 @@
 # InsightCli User Manual
 
 Version: 1.0
-Last Updated: 2026-05-03
+Last Updated: 2026-05-07
 Language: English
 
 ## 1. What InsightCli Is
@@ -80,7 +80,22 @@ Example:
 - `E1002`: Unsupported trace file extension.
 - `E1003`: Invalid option or argument value.
 - `E2001`: Unknown command/action or unknown requested entity.
-- `E3001`: Trace-backed provider unavailable for that command.
+- `E3001`: Trace-backed provider unavailable (compat top-level code).
+
+For trace-unavailable paths, `details` now includes structured fields:
+- `error_subcode`: fine-grained subtype (`E3001`..`E3008`).
+- `retryable`: `true|false`.
+- `next_action_hint`: operator guidance.
+
+Common subcodes:
+- `E3001`: channel disabled.
+- `E3002`: provider unavailable.
+- `E3003`: frame-range/index out of bounds.
+- `E3004`: entity not found.
+- `E3005`: analysis timeout.
+- `E3006`: trace truncated/corrupted.
+- `E3007`: thread/task id missing in trace.
+- `E3008`: incompatible trace version.
 
 ## 4. Global Behavior and Conventions
 
@@ -90,6 +105,23 @@ Example:
 - Global output options:
   - `--fields a,b,c`: project fields from `data` rows/objects. Unknown fields are ignored and echoed in `meta.fields_missing`.
   - `--max-rows N`: soft row cap for `data` arrays. When truncation happens, response includes `meta.truncated=true` and `meta.row_count_actual`.
+  - `--page-size N`: server-side pagination size for `data` arrays.
+  - `--cursor <opaque>`: pagination cursor returned by previous page (`meta.next_cursor`).
+- Pagination metadata:
+  - `meta.cursor_schema` (currently `v1`)
+  - `meta.row_count_total`
+  - `meta.row_count_returned`
+  - `meta.next_cursor` (or `null` when no next page)
+- Pagination constraints:
+  - `--cursor` requires `--page-size`.
+  - `--page-size` cannot be combined with `--limit`.
+- Frame domain conventions:
+  - Default frame domain is `game`.
+  - Commands that support `--frame-domain` accept: `game|rendering`.
+  - Responses may include `frame_domain`, `frame_domain_default`, `game_frame_index`, and `rendering_frame_index`.
+- Top-level catalog commands:
+  - `help` includes per-command `quality_tag` and channel requirements.
+  - `schema` includes `required_channels`, `optional_channels`, `data_quality`, and `may_be_empty`.
 - `not found` in valid query contexts usually returns:
   - exit code `0`
   - empty `data`
@@ -139,6 +171,23 @@ Notes:
 - end_timestamp is computed as start_timestamp + duration_ms; when duration_ms is zero, end_timestamp is null.
 - unavailable values are encoded as JSON null, and field names are listed in meta.unavailable_fields.
 - `thread_id = -1` means the field is unspecified for that row and does not map to a concrete trace thread id.
+- `meta.frame_domain_default` indicates the default frame-domain semantic (currently `game`).
+
+## 5.1.1 `info capabilities`
+
+Purpose:
+- Report command availability against current trace channels.
+
+Output:
+- Per command status: `available|partial|unavailable`.
+- Includes command quality metadata (`data_quality`, `may_be_empty`) and missing required channels.
+- Summary metadata includes `available_count`, `partial_count`, `unavailable_count`.
+
+Example:
+
+```powershell
+InsightCli.exe C:/traces/run01.utrace info capabilities
+```
 
 ## 5.2 `frames summary`
 
@@ -572,7 +621,9 @@ Purpose:
 - Return top material buckets by draw call count.
 
 Notes:
-- When material-level channels are unavailable, output uses a single `unknown` bucket.
+- Requires RHI draw channels (`RHIDraws`/`RDG`).
+- If required channels are disabled, command returns trace-unavailable error (`E3001`) with `details.unavailable_reason=channel_disabled`.
+- No legacy single `unknown` fallback bucket.
 
 ## 5.8.5 `rhi top-meshes`
 
@@ -580,7 +631,9 @@ Purpose:
 - Return top mesh buckets by draw call count.
 
 Notes:
-- When mesh-level channels are unavailable, output uses a single `unknown` bucket.
+- Requires RHI draw channels (`RHIDraws`/`RDG`).
+- If required channels are disabled, command returns trace-unavailable error (`E3001`) with `details.unavailable_reason=channel_disabled`.
+- No legacy single `unknown` fallback bucket.
 
 ## 5.8.6 `slate top-widgets`
 
@@ -759,6 +812,7 @@ Purpose:
 Options:
 - `--frame-index <n>` (optional): Restrict waiting samples to one frame.
 - `--limit <n>`: Maximum number of wait samples.
+- `--frame-domain <game|rendering>` (optional): Frame index domain. Default: `game`.
 
 Example:
 
@@ -773,10 +827,13 @@ Sample output:
   "data": [
     {
       "frame_index": 120,
+      "game_frame_index": 120,
+      "rendering_frame_index": 119,
       "thread_id": 1234,
       "thread_name": "GameThread",
       "wait_type": "Event",
       "wait_object": "SyncObj#1200",
+      "wait_source_provider": "ContextSwitchesProvider",
       "wait_ms": 3.5,
       "owner_thread_id": 5678,
       "owner_thread_name": "RenderThread",
@@ -790,6 +847,13 @@ Sample output:
       "end_ms": 5104.5
     }
   ]
+  ,
+  "meta": {
+    "frame_domain": "game",
+    "frame_domain_default": "game",
+    "wait_source_provider": "ContextSwitchesProvider",
+    "data_source": "context_switch_heuristic"
+  }
 }
 ```
 
@@ -803,6 +867,7 @@ Options:
 - `--depth <n>`: Max hop depth to emit. Default: `4`.
 - `--time-start <ms>`: Inclusive start timestamp in milliseconds.
 - `--time-end <ms>`: Exclusive end timestamp in milliseconds.
+- `--frame-domain <game|rendering>` (optional): Frame index domain. Default: `game`.
 
 Example:
 
@@ -851,7 +916,10 @@ Sample output:
   "meta": {
     "thread": "GameThread",
     "depth": "4",
-    "data_source": "trace"
+    "frame_domain": "game",
+    "frame_domain_default": "game",
+    "wait_source_provider": "ContextSwitchesProvider",
+    "data_source": "context_switch_heuristic"
   }
 }
 ```
@@ -864,6 +932,7 @@ Purpose:
 Options:
 - `--frame-index <n>` (optional): Restrict task diagnostics to one frame.
 - `--limit <n>`: Maximum number of task rows.
+- `--frame-domain <game|rendering>` (optional): Frame index domain. Default: `game`.
 
 Example:
 
@@ -879,6 +948,8 @@ Sample output:
     {
       "task_id": 1001,
       "frame_index": 120,
+      "game_frame_index": 120,
+      "rendering_frame_index": 119,
       "task_name": "BuildVisibilityLists",
       "queue_name": "AnyThread",
       "dependency_task_ids": [1000],
@@ -895,6 +966,12 @@ Sample output:
       "worker_thread_id": 72
     }
   ]
+  ,
+  "meta": {
+    "frame_domain": "game",
+    "frame_domain_default": "game",
+    "data_source": "trace"
+  }
 }
 ```
 
@@ -906,6 +983,7 @@ Purpose:
 Options:
 - `--frame-index <n>` (required): Target frame index.
 - `--top <k>`: Number of critical paths to return. Default: `3`.
+- `--frame-domain <game|rendering>` (optional): Frame index domain. Default: `game`.
 
 Example:
 
